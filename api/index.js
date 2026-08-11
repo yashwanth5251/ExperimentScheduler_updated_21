@@ -1,4 +1,4 @@
 'use strict';
 
-// Vercel serverless entry — re-exports the Express app
+// Vercel serverless entry — Express app with all routes
 module.exports = require('../server/index.js');

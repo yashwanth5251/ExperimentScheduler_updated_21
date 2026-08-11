@@ -1,7 +1,6 @@
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
+const { resolveBackend } = require('./persistence');
 
 const META_TYPE = '__type';
 const META_VALUE = '__value';
@@ -32,64 +31,22 @@ function deserializeGrid(grid) {
   return (grid || []).map((row) => row.map(deserializeCell));
 }
 
-/**
- * Pure-JS sheet store (JSON files). No native modules — Vercel-compatible.
- * Layout under dbDir:
- *   sheets/<name>.json  — 2D grid
- *   props.json
- *   cache.json
- */
 function createSpreadsheetStore(dbPath) {
-  // dbPath may be a .sqlite path from older config; use its directory + basename stem
-  const dbDir = dbPath.endsWith('.sqlite') || dbPath.endsWith('.db')
-    ? path.join(path.dirname(dbPath), path.basename(dbPath, path.extname(dbPath)) + '_store')
-    : dbPath;
-  const sheetsDir = path.join(dbDir, 'sheets');
-  fs.mkdirSync(sheetsDir, { recursive: true });
-
-  const propsPath = path.join(dbDir, 'props.json');
-  const cachePath = path.join(dbDir, 'cache.json');
-
-  function readJson(file, fallback) {
-    try {
-      if (!fs.existsSync(file)) return fallback;
-      return JSON.parse(fs.readFileSync(file, 'utf8'));
-    } catch (e) {
-      return fallback;
-    }
-  }
-
-  function writeJson(file, data) {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify(data));
-  }
-
+  const backend = resolveBackend(dbPath);
   const memory = new Map();
-
-  function sheetFile(name) {
-    return path.join(sheetsDir, encodeURIComponent(name) + '.json');
-  }
 
   function loadSheet(name) {
     if (memory.has(name)) return memory.get(name);
-    const file = sheetFile(name);
-    if (!fs.existsSync(file)) return null;
-    const grid = deserializeGrid(readJson(file, []));
+    const raw = backend.loadSheet(name);
+    if (!raw) return null;
+    const grid = deserializeGrid(raw);
     memory.set(name, grid);
     return grid;
   }
 
   function saveSheet(name, grid) {
     memory.set(name, grid);
-    writeJson(sheetFile(name), serializeGrid(grid));
-  }
-
-  function listSheetNames() {
-    if (!fs.existsSync(sheetsDir)) return [];
-    return fs.readdirSync(sheetsDir)
-      .filter((f) => f.endsWith('.json'))
-      .map((f) => decodeURIComponent(f.replace(/\.json$/, '')))
-      .sort();
+    backend.saveSheet(name, serializeGrid(grid));
   }
 
   function ensureCols(grid, cols) {
@@ -238,48 +195,48 @@ function createSpreadsheetStore(dbPath) {
   const stmts = {
     getProp: {
       get(key) {
-        const props = readJson(propsPath, {});
+        const props = backend.getProps();
         return Object.prototype.hasOwnProperty.call(props, key) ? { value: props[key] } : undefined;
       }
     },
     setProp: {
       run(key, value) {
-        const props = readJson(propsPath, {});
+        const props = backend.getProps();
         props[key] = value;
-        writeJson(propsPath, props);
+        backend.setProps(props);
       }
     },
     deleteProp: {
       run(key) {
-        const props = readJson(propsPath, {});
+        const props = backend.getProps();
         delete props[key];
-        writeJson(propsPath, props);
+        backend.setProps(props);
       }
     },
     getCache: {
       get(key) {
-        const cache = readJson(cachePath, {});
+        const cache = backend.getCache();
         const row = cache[key];
         return row ? { value: row.value, expires: row.expires } : undefined;
       }
     },
     setCache: {
       run(key, value, expires) {
-        const cache = readJson(cachePath, {});
+        const cache = backend.getCache();
         cache[key] = { value, expires };
-        writeJson(cachePath, cache);
+        backend.setCache(cache);
       }
     },
     deleteCache: {
       run(key) {
-        const cache = readJson(cachePath, {});
+        const cache = backend.getCache();
         delete cache[key];
-        writeJson(cachePath, cache);
+        backend.setCache(cache);
       }
     },
     deleteExpiredCache: {
       run(now) {
-        const cache = readJson(cachePath, {});
+        const cache = backend.getCache();
         let changed = false;
         Object.keys(cache).forEach((k) => {
           if (cache[k].expires > 0 && cache[k].expires < now) {
@@ -287,13 +244,13 @@ function createSpreadsheetStore(dbPath) {
             changed = true;
           }
         });
-        if (changed) writeJson(cachePath, cache);
+        if (changed) backend.setCache(cache);
       }
     }
   };
 
   const spreadsheet = {
-    getId() { return 'local-json'; },
+    getId() { return 'vercel-compatible-store'; },
     getSheetByName(sheetName) {
       const g = loadSheet(sheetName);
       if (!g) return null;
@@ -304,13 +261,12 @@ function createSpreadsheetStore(dbPath) {
       return createSheet(sheetName, [[]]);
     },
     getSheets() {
-      return listSheetNames().map((n) => createSheet(n, loadSheet(n)));
+      return backend.listSheets().map((n) => createSheet(n, loadSheet(n)));
     },
     deleteSheet(sheet) {
       const n = typeof sheet === 'string' ? sheet : sheet.getName();
       memory.delete(n);
-      const file = sheetFile(n);
-      if (fs.existsSync(file)) fs.unlinkSync(file);
+      backend.deleteSheet(n);
     },
     flush() { /* sync already */ }
   };
@@ -323,7 +279,7 @@ function createSpreadsheetStore(dbPath) {
     loadSheet,
     saveSheet,
     memory,
-    dbDir
+    backend
   };
 }
 

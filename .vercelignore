@@ -1,0 +1,8 @@
+data
+credentials
+.env
+*.sqlite
+*.sqlite-*
+.git
+.DS_Store
+CHANGELOG_*.md

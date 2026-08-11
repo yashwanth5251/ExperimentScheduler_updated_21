@@ -46,9 +46,10 @@ if (!demoMode) {
 ensureGoogleCredentials();
 
 const projectRoot = path.join(__dirname, '..');
-const detectedHost = process.env.RENDER_EXTERNAL_URL
+const detectedHost = process.env.BASE_URL
+  || process.env.RENDER_EXTERNAL_URL
+  || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? ('https://' + process.env.VERCEL_PROJECT_PRODUCTION_URL) : null)
   || (process.env.VERCEL_URL ? ('https://' + process.env.VERCEL_URL) : null)
-  || process.env.BASE_URL
   || 'http://localhost:3000';
 const baseUrl = String(detectedHost).replace(/\/$/, '');
 const timezone = process.env.SCRIPT_TIMEZONE || 'Europe/Berlin';
@@ -65,11 +66,14 @@ const driveDir = path.join(dataRoot, 'drive');
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 fs.mkdirSync(driveDir, { recursive: true });
 
-let runtime;
+// Reuse runtime across warm serverless invocations
+const g = globalThis;
+if (!g.__experimentScheduler) g.__experimentScheduler = {};
+
 function getRuntime() {
-  if (runtime) return runtime;
+  if (g.__experimentScheduler.runtime) return g.__experimentScheduler.runtime;
   console.log('Loading Apps Script runtime (Code.gs)…');
-  runtime = createRuntime({
+  const runtime = createRuntime({
     dbPath,
     baseUrl: process.env.BASE_URL ? process.env.BASE_URL.replace(/\/$/, '') : baseUrl,
     timezone,
@@ -77,25 +81,41 @@ function getRuntime() {
     driveDir,
     projectRoot
   });
-  try {
-    runtime.call('initializeSpreadsheet', []);
-  } catch (err) {
-    console.error('initializeSpreadsheet failed:', err);
-    throw err;
-  }
+  runtime.call('initializeSpreadsheet', []);
+  g.__experimentScheduler.runtime = runtime;
   return runtime;
 }
 
 function createApp() {
-  // Warm runtime at module load for local; on Vercel first request also warms
-  getRuntime();
+  // Local: warm immediately. Vercel: lazy on first request (faster cold deploy).
+  if (!isVercel) {
+    try { getRuntime(); } catch (err) {
+      console.error('Startup initialize failed:', err);
+      throw err;
+    }
+  }
 
   const app = express();
   app.use(express.json({ limit: '5mb' }));
   app.use(express.urlencoded({ extended: true }));
 
+  app.use(function (_req, _res, next) {
+    try {
+      getRuntime();
+      next();
+    } catch (err) {
+      next(err);
+    }
+  });
+
   app.get('/health', function (_req, res) {
-    res.json({ ok: true, vercel: isVercel });
+    const hasRedis = !!(process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL);
+    res.json({
+      ok: true,
+      vercel: isVercel,
+      persistence: hasRedis ? 'redis' : 'file',
+      demoMode
+    });
   });
 
   app.get('/', function (req, res) {
@@ -184,10 +204,11 @@ function createApp() {
     res.json({ functions: Object.keys(getRuntime().api).sort() });
   });
 
-  // Cron endpoint for Vercel Cron Jobs
   app.get('/api/cron/reminders', function (req, res) {
     const auth = req.headers.authorization || '';
-    if (process.env.CRON_SECRET && auth !== 'Bearer ' + process.env.CRON_SECRET) {
+    const cronSecret = process.env.CRON_SECRET;
+    // Vercel Cron sends Authorization: Bearer <CRON_SECRET> when configured
+    if (cronSecret && auth !== 'Bearer ' + cronSecret) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     try {
@@ -201,6 +222,11 @@ function createApp() {
     }
   });
 
+  app.use(function (err, _req, res, _next) {
+    console.error('Unhandled error:', err);
+    res.status(500).json({ error: err && err.message ? err.message : String(err) });
+  });
+
   return app;
 }
 
@@ -208,7 +234,6 @@ const app = createApp();
 
 if (!isVercel && require.main === module) {
   const port = parseInt(process.env.PORT || '3000', 10);
-  // Local daily reminders
   try {
     const cron = require('node-cron');
     cron.schedule('0 7 * * *', function () {

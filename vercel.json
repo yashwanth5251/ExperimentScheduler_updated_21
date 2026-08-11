@@ -3,7 +3,8 @@
   "functions": {
     "api/index.js": {
       "includeFiles": "{Code.gs,*.html,server/**}",
-      "maxDuration": 60
+      "maxDuration": 60,
+      "memory": 1024
     }
   },
   "rewrites": [
