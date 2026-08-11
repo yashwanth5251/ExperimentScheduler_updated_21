@@ -2,7 +2,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const Database = require('better-sqlite3');
 
 const META_TYPE = '__type';
 const META_VALUE = '__value';
@@ -26,61 +25,71 @@ function deserializeCell(value) {
 }
 
 function serializeGrid(grid) {
-  return JSON.stringify(grid.map((row) => row.map(serializeCell)));
+  return grid.map((row) => row.map(serializeCell));
 }
 
-function deserializeGrid(raw) {
-  const grid = JSON.parse(raw || '[]');
-  return grid.map((row) => row.map(deserializeCell));
+function deserializeGrid(grid) {
+  return (grid || []).map((row) => row.map(deserializeCell));
 }
 
+/**
+ * Pure-JS sheet store (JSON files). No native modules — Vercel-compatible.
+ * Layout under dbDir:
+ *   sheets/<name>.json  — 2D grid
+ *   props.json
+ *   cache.json
+ */
 function createSpreadsheetStore(dbPath) {
-  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-  const db = new Database(dbPath);
-  db.pragma('journal_mode = WAL');
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS sheets (
-      name TEXT PRIMARY KEY,
-      data TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS props (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS cache (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      expires INTEGER NOT NULL
-    );
-  `);
+  // dbPath may be a .sqlite path from older config; use its directory + basename stem
+  const dbDir = dbPath.endsWith('.sqlite') || dbPath.endsWith('.db')
+    ? path.join(path.dirname(dbPath), path.basename(dbPath, path.extname(dbPath)) + '_store')
+    : dbPath;
+  const sheetsDir = path.join(dbDir, 'sheets');
+  fs.mkdirSync(sheetsDir, { recursive: true });
 
-  const stmts = {
-    getSheet: db.prepare('SELECT data FROM sheets WHERE name = ?'),
-    upsertSheet: db.prepare('INSERT INTO sheets(name, data) VALUES(?, ?) ON CONFLICT(name) DO UPDATE SET data = excluded.data'),
-    deleteSheet: db.prepare('DELETE FROM sheets WHERE name = ?'),
-    listSheets: db.prepare('SELECT name FROM sheets ORDER BY name'),
-    getProp: db.prepare('SELECT value FROM props WHERE key = ?'),
-    setProp: db.prepare('INSERT INTO props(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'),
-    deleteProp: db.prepare('DELETE FROM props WHERE key = ?'),
-    getCache: db.prepare('SELECT value, expires FROM cache WHERE key = ?'),
-    setCache: db.prepare('INSERT INTO cache(key, value, expires) VALUES(?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, expires = excluded.expires'),
-    deleteCache: db.prepare('DELETE FROM cache WHERE key = ?'),
-    deleteExpiredCache: db.prepare('DELETE FROM cache WHERE expires > 0 AND expires < ?')
-  };
+  const propsPath = path.join(dbDir, 'props.json');
+  const cachePath = path.join(dbDir, 'cache.json');
+
+  function readJson(file, fallback) {
+    try {
+      if (!fs.existsSync(file)) return fallback;
+      return JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch (e) {
+      return fallback;
+    }
+  }
+
+  function writeJson(file, data) {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify(data));
+  }
 
   const memory = new Map();
 
+  function sheetFile(name) {
+    return path.join(sheetsDir, encodeURIComponent(name) + '.json');
+  }
+
   function loadSheet(name) {
     if (memory.has(name)) return memory.get(name);
-    const row = stmts.getSheet.get(name);
-    const grid = row ? deserializeGrid(row.data) : null;
-    if (grid) memory.set(name, grid);
+    const file = sheetFile(name);
+    if (!fs.existsSync(file)) return null;
+    const grid = deserializeGrid(readJson(file, []));
+    memory.set(name, grid);
     return grid;
   }
 
   function saveSheet(name, grid) {
     memory.set(name, grid);
-    stmts.upsertSheet.run(name, serializeGrid(grid));
+    writeJson(sheetFile(name), serializeGrid(grid));
+  }
+
+  function listSheetNames() {
+    if (!fs.existsSync(sheetsDir)) return [];
+    return fs.readdirSync(sheetsDir)
+      .filter((f) => f.endsWith('.json'))
+      .map((f) => decodeURIComponent(f.replace(/\.json$/, '')))
+      .sort();
   }
 
   function ensureCols(grid, cols) {
@@ -98,7 +107,6 @@ function createSpreadsheetStore(dbPath) {
   }
 
   function createRange(sheetName, startRow, startCol, numRows, numCols) {
-    // Apps Script Sheet.getRange(row, column, numRows, numColumns) — 1-based
     const range = {
       getValues() {
         const grid = loadSheet(sheetName) || [[]];
@@ -116,9 +124,7 @@ function createSpreadsheetStore(dbPath) {
       },
       getDisplayValues() {
         return range.getValues().map((row) => row.map((v) => {
-          if (Object.prototype.toString.call(v) === '[object Date]') {
-            return v.toISOString();
-          }
+          if (Object.prototype.toString.call(v) === '[object Date]') return v.toISOString();
           return v === null || v === undefined ? '' : String(v);
         }));
       },
@@ -135,12 +141,8 @@ function createSpreadsheetStore(dbPath) {
         saveSheet(sheetName, grid);
         return range;
       },
-      setValue(value) {
-        return range.setValues([[value]]);
-      },
-      getValue() {
-        return range.getValues()[0][0];
-      },
+      setValue(value) { return range.setValues([[value]]); },
+      getValue() { return range.getValues()[0][0]; },
       setFontWeight() { return range; },
       setNumberFormat() { return range; },
       insertCheckboxes() { return range; },
@@ -163,8 +165,7 @@ function createSpreadsheetStore(dbPath) {
         let last = 0;
         for (let r = 0; r < g.length; r++) {
           const row = g[r] || [];
-          const has = row.some((c) => c !== '' && c !== null && c !== undefined);
-          if (has) last = r + 1;
+          if (row.some((c) => c !== '' && c !== null && c !== undefined)) last = r + 1;
         }
         return last;
       },
@@ -174,9 +175,7 @@ function createSpreadsheetStore(dbPath) {
         for (let r = 0; r < g.length; r++) {
           const row = g[r] || [];
           for (let c = 0; c < row.length; c++) {
-            if (row[c] !== '' && row[c] !== null && row[c] !== undefined) {
-              last = Math.max(last, c + 1);
-            }
+            if (row[c] !== '' && row[c] !== null && row[c] !== undefined) last = Math.max(last, c + 1);
           }
         }
         return last;
@@ -186,13 +185,8 @@ function createSpreadsheetStore(dbPath) {
         return Math.max(g.length, 1000);
       },
       getRange(a, b, c, d) {
-        if (typeof a === 'string') {
-          throw new Error('A1 notation getRange is not used by this app: ' + a);
-        }
-        if (c === undefined) {
-          return createRange(name, a, b, 1, 1);
-        }
-        // (row, column, numRows, numColumns)
+        if (typeof a === 'string') throw new Error('A1 notation getRange is not used by this app: ' + a);
+        if (c === undefined) return createRange(name, a, b, 1, 1);
         return createRange(name, a, b, c, d);
       },
       getDataRange() {
@@ -205,20 +199,14 @@ function createSpreadsheetStore(dbPath) {
         const last = sheet.getLastRow();
         const width = Math.max(g[0] ? g[0].length : 0, rowValues.length);
         ensureCols(g, width);
-        // Ensure header row exists
         if (g.length === 0) g.push(Array(width).fill(''));
-        while (g.length < last) {
-          g.push(Array(width).fill(''));
-        }
+        while (g.length < last) g.push(Array(width).fill(''));
         const newRow = Array(width).fill('');
         for (let i = 0; i < rowValues.length; i++) {
           newRow[i] = rowValues[i] === undefined || rowValues[i] === null ? '' : rowValues[i];
         }
-        if (last === 0) {
-          g[0] = newRow;
-        } else {
-          g.push(newRow);
-        }
+        if (last === 0) g[0] = newRow;
+        else g.push(newRow);
         saveSheet(name, g);
         return sheet;
       },
@@ -247,38 +235,95 @@ function createSpreadsheetStore(dbPath) {
     return sheet;
   }
 
+  const stmts = {
+    getProp: {
+      get(key) {
+        const props = readJson(propsPath, {});
+        return Object.prototype.hasOwnProperty.call(props, key) ? { value: props[key] } : undefined;
+      }
+    },
+    setProp: {
+      run(key, value) {
+        const props = readJson(propsPath, {});
+        props[key] = value;
+        writeJson(propsPath, props);
+      }
+    },
+    deleteProp: {
+      run(key) {
+        const props = readJson(propsPath, {});
+        delete props[key];
+        writeJson(propsPath, props);
+      }
+    },
+    getCache: {
+      get(key) {
+        const cache = readJson(cachePath, {});
+        const row = cache[key];
+        return row ? { value: row.value, expires: row.expires } : undefined;
+      }
+    },
+    setCache: {
+      run(key, value, expires) {
+        const cache = readJson(cachePath, {});
+        cache[key] = { value, expires };
+        writeJson(cachePath, cache);
+      }
+    },
+    deleteCache: {
+      run(key) {
+        const cache = readJson(cachePath, {});
+        delete cache[key];
+        writeJson(cachePath, cache);
+      }
+    },
+    deleteExpiredCache: {
+      run(now) {
+        const cache = readJson(cachePath, {});
+        let changed = false;
+        Object.keys(cache).forEach((k) => {
+          if (cache[k].expires > 0 && cache[k].expires < now) {
+            delete cache[k];
+            changed = true;
+          }
+        });
+        if (changed) writeJson(cachePath, cache);
+      }
+    }
+  };
+
   const spreadsheet = {
-    getId() { return 'local-sqlite'; },
+    getId() { return 'local-json'; },
     getSheetByName(sheetName) {
       const g = loadSheet(sheetName);
       if (!g) return null;
       return createSheet(sheetName, g);
     },
     insertSheet(sheetName) {
-      if (loadSheet(sheetName)) {
-        throw new Error('Sheet already exists: ' + sheetName);
-      }
+      if (loadSheet(sheetName)) throw new Error('Sheet already exists: ' + sheetName);
       return createSheet(sheetName, [[]]);
     },
     getSheets() {
-      return stmts.listSheets.all().map((r) => createSheet(r.name, loadSheet(r.name)));
+      return listSheetNames().map((n) => createSheet(n, loadSheet(n)));
     },
     deleteSheet(sheet) {
       const n = typeof sheet === 'string' ? sheet : sheet.getName();
       memory.delete(n);
-      stmts.deleteSheet.run(n);
+      const file = sheetFile(n);
+      if (fs.existsSync(file)) fs.unlinkSync(file);
     },
     flush() { /* sync already */ }
   };
 
   return {
-    db,
+    db: null,
     stmts,
     spreadsheet,
     createSheet,
     loadSheet,
     saveSheet,
-    memory
+    memory,
+    dbDir
   };
 }
 

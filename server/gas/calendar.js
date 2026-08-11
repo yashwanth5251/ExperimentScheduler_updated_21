@@ -5,19 +5,27 @@ const path = require('path');
 const { google } = require('googleapis');
 
 function loadAuth() {
+  const impersonate = process.env.GOOGLE_CALENDAR_IMPERSONATE || undefined;
+  const scopes = ['https://www.googleapis.com/auth/calendar'];
+  const clientOptions = impersonate ? { subject: impersonate } : undefined;
+
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+    return new google.auth.GoogleAuth({ credentials, scopes, clientOptions });
+  }
+
   const keyFile = process.env.GOOGLE_SERVICE_ACCOUNT_FILE;
   if (!keyFile) {
-    throw new Error('Missing required env var: GOOGLE_SERVICE_ACCOUNT_FILE');
+    throw new Error('Missing GOOGLE_SERVICE_ACCOUNT_FILE or GOOGLE_SERVICE_ACCOUNT_JSON');
   }
   const resolved = path.resolve(keyFile);
   if (!fs.existsSync(resolved)) {
     throw new Error('Google service account file not found: ' + resolved);
   }
-  const impersonate = process.env.GOOGLE_CALENDAR_IMPERSONATE || undefined;
   return new google.auth.GoogleAuth({
     keyFile: resolved,
-    scopes: ['https://www.googleapis.com/auth/calendar'],
-    clientOptions: impersonate ? { subject: impersonate } : undefined
+    scopes,
+    clientOptions
   });
 }
 

@@ -9,14 +9,24 @@ async function main() {
   const outFile = process.argv[3];
   const req = JSON.parse(fs.readFileSync(inFile, 'utf8'));
 
-  const keyFile = process.env.GOOGLE_SERVICE_ACCOUNT_FILE;
-  const resolved = path.resolve(keyFile);
   const impersonate = process.env.GOOGLE_CALENDAR_IMPERSONATE || undefined;
-  const auth = new google.auth.GoogleAuth({
-    keyFile: resolved,
-    scopes: ['https://www.googleapis.com/auth/calendar'],
-    clientOptions: impersonate ? { subject: impersonate } : undefined
-  });
+  const scopes = ['https://www.googleapis.com/auth/calendar'];
+  const clientOptions = impersonate ? { subject: impersonate } : undefined;
+  let auth;
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    auth = new google.auth.GoogleAuth({
+      credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON),
+      scopes,
+      clientOptions
+    });
+  } else {
+    const keyFile = process.env.GOOGLE_SERVICE_ACCOUNT_FILE;
+    auth = new google.auth.GoogleAuth({
+      keyFile: path.resolve(keyFile),
+      scopes,
+      clientOptions
+    });
+  }
   const authClient = await auth.getClient();
   const calendar = google.calendar({ version: 'v3', auth: authClient });
 
