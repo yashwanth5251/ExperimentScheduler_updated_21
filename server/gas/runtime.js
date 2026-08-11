@@ -80,7 +80,13 @@ function createRuntime(options) {
   vm.createContext(sandbox);
 
   const codePath = path.join(projectRoot, 'Code.gs');
-  const code = fs.readFileSync(codePath, 'utf8');
+  const altPath = path.join(__dirname, '..', '..', 'Code.gs');
+  const resolved = fs.existsSync(codePath) ? codePath
+    : (fs.existsSync(altPath) ? altPath : codePath);
+  if (!fs.existsSync(resolved)) {
+    throw new Error('Code.gs missing. Tried: ' + codePath + ' and ' + altPath);
+  }
+  const code = fs.readFileSync(resolved, 'utf8');
 
   // Override CONFIG owner email/password from env after load if present
   vm.runInContext(code, sandbox, { filename: 'Code.gs' });

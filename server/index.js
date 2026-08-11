@@ -3,49 +3,70 @@
 const path = require('path');
 const fs = require('fs');
 const express = require('express');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const { createRuntime } = require('./gas/runtime');
-const { renderTemplate } = require('./pages');
+// Load .env only when present (local). Never crash if missing on Vercel.
+try {
+  require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+} catch (e) { /* ignore */ }
 
 const isVercel = !!(process.env.VERCEL || process.env.NOW_REGION);
 const isRender = !!process.env.RENDER;
-const demoMode = String(process.env.ALLOW_INSECURE_DEMO || '').toLowerCase() === 'true' ||
-  String(process.env.ALLOW_INSECURE_DEMO || '') === '1';
 
-function requireEnv(name) {
-  if (!process.env[name]) {
-    throw new Error('Missing required environment variable: ' + name);
-  }
+function smtpConfigured() {
+  return !!(process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER &&
+    process.env.SMTP_PASS && process.env.SMTP_FROM);
+}
+
+function googleConfigured() {
+  return !!(process.env.GOOGLE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_SERVICE_ACCOUNT_FILE);
+}
+
+// Auto-enable demo mode on Vercel/Render when secrets are missing — prevents boot crash.
+const demoMode = String(process.env.ALLOW_INSECURE_DEMO || '').toLowerCase() === 'true' ||
+  String(process.env.ALLOW_INSECURE_DEMO || '') === '1' ||
+  ((isVercel || isRender) && (!smtpConfigured() || !googleConfigured()));
+
+if (demoMode) {
+  process.env.ALLOW_INSECURE_DEMO = '1';
 }
 
 function ensureGoogleCredentials() {
   if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    const dest = path.join(
-      (isVercel || isRender) ? '/tmp' : path.join(__dirname, '..', 'credentials'),
-      'google-service-account.json'
-    );
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    if (!fs.existsSync(dest)) {
+    try {
+      const dest = path.join(
+        (isVercel || isRender) ? '/tmp' : path.join(__dirname, '..', 'credentials'),
+        'google-service-account.json'
+      );
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
       const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
       const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
       fs.writeFileSync(dest, JSON.stringify(parsed, null, 2));
+      process.env.GOOGLE_SERVICE_ACCOUNT_FILE = dest;
+    } catch (err) {
+      console.error('Failed to materialize Google credentials:', err);
+      process.env.ALLOW_INSECURE_DEMO = '1';
     }
-    process.env.GOOGLE_SERVICE_ACCOUNT_FILE = dest;
-    return;
-  }
-  if (demoMode) return;
-  if (!process.env.GOOGLE_SERVICE_ACCOUNT_FILE) {
-    throw new Error('Missing GOOGLE_SERVICE_ACCOUNT_FILE or GOOGLE_SERVICE_ACCOUNT_JSON (or set ALLOW_INSECURE_DEMO=1)');
   }
 }
 
-if (!demoMode) {
-  ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'].forEach(requireEnv);
-}
 ensureGoogleCredentials();
 
-const projectRoot = path.join(__dirname, '..');
+function resolveProjectRoot() {
+  const candidates = [
+    path.join(__dirname, '..'),
+    process.cwd(),
+    path.join(process.cwd(), '..'),
+    '/var/task',
+    path.join(__dirname, '..', '..')
+  ];
+  for (const root of candidates) {
+    if (fs.existsSync(path.join(root, 'Code.gs'))) return root;
+  }
+  // Fall back — runtime will throw a clearer error
+  return path.join(__dirname, '..');
+}
+
+const projectRoot = resolveProjectRoot();
 const detectedHost = process.env.BASE_URL
   || process.env.RENDER_EXTERNAL_URL
   || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? ('https://' + process.env.VERCEL_PROJECT_PRODUCTION_URL) : null)
@@ -63,16 +84,29 @@ const dbPath = process.env.DATABASE_PATH
   : path.join(dataRoot, 'scheduler.sqlite');
 const driveDir = path.join(dataRoot, 'drive');
 
-fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-fs.mkdirSync(driveDir, { recursive: true });
+try {
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+  fs.mkdirSync(driveDir, { recursive: true });
+} catch (err) {
+  console.error('mkdir data dirs failed:', err);
+}
 
-// Reuse runtime across warm serverless invocations
 const g = globalThis;
 if (!g.__experimentScheduler) g.__experimentScheduler = {};
 
 function getRuntime() {
   if (g.__experimentScheduler.runtime) return g.__experimentScheduler.runtime;
-  console.log('Loading Apps Script runtime (Code.gs)…');
+
+  if (!fs.existsSync(path.join(projectRoot, 'Code.gs'))) {
+    throw new Error(
+      'Code.gs not found at projectRoot=' + projectRoot +
+      '. cwd=' + process.cwd() + ' __dirname=' + __dirname +
+      '. Ensure vercel.json includeFiles packs Code.gs.'
+    );
+  }
+
+  const { createRuntime } = require('./gas/runtime');
+  console.log('Loading Apps Script runtime (Code.gs) from', projectRoot);
   const runtime = createRuntime({
     dbPath,
     baseUrl: process.env.BASE_URL ? process.env.BASE_URL.replace(/\/$/, '') : baseUrl,
@@ -87,7 +121,8 @@ function getRuntime() {
 }
 
 function createApp() {
-  // Local: warm immediately. Vercel: lazy on first request (faster cold deploy).
+  const { renderTemplate } = require('./pages');
+
   if (!isVercel) {
     try { getRuntime(); } catch (err) {
       console.error('Startup initialize failed:', err);
@@ -99,60 +134,68 @@ function createApp() {
   app.use(express.json({ limit: '5mb' }));
   app.use(express.urlencoded({ extended: true }));
 
-  app.use(function (_req, _res, next) {
-    try {
-      getRuntime();
-      next();
-    } catch (err) {
-      next(err);
-    }
-  });
-
   app.get('/health', function (_req, res) {
     const hasRedis = !!(process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL);
     res.json({
       ok: true,
       vercel: isVercel,
       persistence: hasRedis ? 'redis' : 'file',
-      demoMode
+      demoMode: String(process.env.ALLOW_INSECURE_DEMO || '') === '1',
+      projectRoot,
+      codeGs: fs.existsSync(path.join(projectRoot, 'Code.gs')),
+      cwd: process.cwd()
     });
   });
 
-  app.get('/', function (req, res) {
+  // Lazy-init runtime for pages/API (not for /health so health can diagnose missing files)
+  function withRuntime(req, res, next) {
+    try {
+      getRuntime();
+      next();
+    } catch (err) {
+      console.error('Runtime init failed:', err);
+      res.status(500).type('html').send(
+        '<h1>Server failed to start runtime</h1><pre>' +
+        String(err && err.stack ? err.stack : err) +
+        '</pre><p>projectRoot=' + projectRoot + '</p>'
+      );
+    }
+  }
+
+  app.get('/', withRuntime, function (req, res) {
     const page = String(req.query.page || '').toLowerCase();
     const action = String(req.query.action || '').toLowerCase();
     const admin = String(req.query.admin || '').toLowerCase();
     if (action === 'manage' || page === 'manage') return res.redirect('/manage');
     if (page === 'admin' || admin === 'true') return res.redirect('/admin');
-    if (page === 'book') return res.redirect('/book');
     return res.redirect('/book');
   });
 
-  app.get('/book', function (_req, res) {
+  app.get('/book', withRuntime, function (_req, res) {
     try {
       res.type('html').send(renderTemplate(projectRoot, 'Index'));
     } catch (err) {
-      res.status(500).send(String(err));
+      res.status(500).send(String(err && err.stack ? err.stack : err));
     }
   });
 
-  app.get('/manage', function (_req, res) {
+  app.get('/manage', withRuntime, function (_req, res) {
     try {
       res.type('html').send(renderTemplate(projectRoot, 'Manage'));
     } catch (err) {
-      res.status(500).send(String(err));
+      res.status(500).send(String(err && err.stack ? err.stack : err));
     }
   });
 
-  app.get('/admin', function (_req, res) {
+  app.get('/admin', withRuntime, function (_req, res) {
     try {
       res.type('html').send(renderTemplate(projectRoot, 'Admin'));
     } catch (err) {
-      res.status(500).send(String(err));
+      res.status(500).send(String(err && err.stack ? err.stack : err));
     }
   });
 
-  app.get('/exec', function (req, res) {
+  app.get('/exec', withRuntime, function (req, res) {
     const page = String(req.query.page || '').toLowerCase();
     const action = String(req.query.action || '').toLowerCase();
     const admin = String(req.query.admin || '').toLowerCase();
@@ -161,7 +204,7 @@ function createApp() {
     return res.redirect('/book');
   });
 
-  app.post('/api/run', function (req, res) {
+  app.post('/api/run', withRuntime, function (req, res) {
     const rt = getRuntime();
     const functionName = req.body && req.body.functionName;
     const args = (req.body && req.body.args) || [];
@@ -188,7 +231,7 @@ function createApp() {
     }
   });
 
-  app.get('/files/:id', function (req, res) {
+  app.get('/files/:id', withRuntime, function (req, res) {
     const id = req.params.id;
     const metaPath = path.join(driveDir, id + '.meta.json');
     if (!fs.existsSync(metaPath)) return res.status(404).send('Not found');
@@ -200,14 +243,13 @@ function createApp() {
     }
   });
 
-  app.get('/api/functions', function (_req, res) {
+  app.get('/api/functions', withRuntime, function (_req, res) {
     res.json({ functions: Object.keys(getRuntime().api).sort() });
   });
 
-  app.get('/api/cron/reminders', function (req, res) {
+  app.get('/api/cron/reminders', withRuntime, function (req, res) {
     const auth = req.headers.authorization || '';
     const cronSecret = process.env.CRON_SECRET;
-    // Vercel Cron sends Authorization: Bearer <CRON_SECRET> when configured
     if (cronSecret && auth !== 'Bearer ' + cronSecret) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -230,7 +272,18 @@ function createApp() {
   return app;
 }
 
-const app = createApp();
+let app;
+try {
+  app = createApp();
+} catch (err) {
+  console.error('createApp failed:', err);
+  app = express();
+  app.get('*', function (_req, res) {
+    res.status(500).type('html').send(
+      '<h1>App failed to boot</h1><pre>' + String(err && err.stack ? err.stack : err) + '</pre>'
+    );
+  });
+}
 
 if (!isVercel && require.main === module) {
   const port = parseInt(process.env.PORT || '3000', 10);
@@ -252,9 +305,6 @@ if (!isVercel && require.main === module) {
 
   app.listen(port, function () {
     console.log('Experiment Scheduler running at ' + baseUrl);
-    console.log('  Book:   ' + baseUrl + '/book');
-    console.log('  Manage: ' + baseUrl + '/manage');
-    console.log('  Admin:  ' + baseUrl + '/admin');
   });
 }
 
