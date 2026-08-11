@@ -1,23 +1,11 @@
 {
-  "version": 2,
-  "functions": {
-    "api/index.js": {
-      "includeFiles": [
-        "Code.gs",
-        "*.html",
-        "server/**"
-      ],
-      "maxDuration": 60,
-      "memory": 1024
-    }
-  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/api" }
   ],
-  "crons": [
-    {
-      "path": "/api/cron/reminders",
-      "schedule": "0 7 * * *"
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "**/*.{gs,html}",
+      "maxDuration": 60
     }
-  ]
+  }
 }
