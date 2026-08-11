@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin — Experiment Scheduling</title>
+  <?!= include('AdminStyles'); ?>
+</head>
+<body>
+  <!-- Round 10: Project ID banner — sits above everything else on every
+       portal (participant, manage-booking, and admin), so anyone using the
+       system can see at a glance which project/study deployment they're on.
+       Purely a display label; only the Main Admin can change it (see the
+       "Project ID" control in the Admin Portal header below). -->
+  <div id="projectIdBanner" class="project-id-banner hidden"></div>
+
+  <div class="admin-container">
+
+    <header class="admin-header">
+      <h1>Admin Portal</h1>
+      <p class="subtitle">Experiment Scheduling — MRI-Based Schedule Management</p>
+      <div id="projectIdControl" class="project-id-control manage-admins-only hidden">
+        <label for="projectIdInput">Project ID</label>
+        <input type="text" id="projectIdInput" maxlength="120" placeholder="e.g. LIN-2026-Aging-Study">
+        <button type="button" class="btn btn-secondary btn-small" id="projectIdSaveBtn">Save</button>
+        <span id="projectIdSavedTag" class="tag tag-ok hidden">Saved</span>
+      </div>
+    </header>
+
+    <!-- Best-effort "signed in as" banner. Real access control for this page
+         is enforced by deploying it with "Only myself" Web App access —
+         see README.md. -->
+    <div id="ownerBanner" class="owner-banner hidden"></div>
+
+    <div id="adminMessageBanner" class="banner hidden" role="alert">
+      <div id="adminMessageTitle" class="concise-title"></div>
+      <ul id="adminMessageLines" class="concise-lines"></ul>
+      <button type="button" id="adminMessageDetailsBtn" class="concise-details-btn hidden">View Details</button>
+    </div>
+
+    <!-- ============ GENERIC DETAILS MODAL (spec: Concise Notifications) ============
+         Reused everywhere a concise banner/message needs a "View Details" or
+         "View All Conflicts" expansion: full slot lists, timestamps, creator
+         info, warnings, and audit details live here instead of cluttering
+         the notification itself. -->
+    <div class="modal-overlay hidden" id="detailsModalOverlay">
+      <div class="modal">
+        <h3 id="detailsModalTitle">Details</h3>
+        <div id="detailsModalBody" class="details-modal-body"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="detailsModalCloseBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ LOGIN ============ -->
+    <section class="panel" id="loginSection">
+      <h2>Admin Login</h2>
+      <p class="hint">Log in with your own admin email and password.</p>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="adminEmail">Email</label>
+          <input type="email" id="adminEmail" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label for="adminPassword">Password</label>
+          <input type="password" id="adminPassword" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary" id="loginBtn">
+          <span id="loginBtnText">Log In</span>
+          <span id="loginSpinner" class="spinner hidden"></span>
+        </button>
+      </form>
+      <p class="hint" style="margin-top: 12px;">
+        <a href="#" id="forgotPasswordLink">Forgot your password?</a>
+      </p>
+    </section>
+
+    <!-- ============ FORGOT PASSWORD ============ -->
+    <section class="panel hidden" id="fpSection">
+      <h2>Reset Your Password</h2>
+
+      <div id="fpStep1">
+        <p class="hint">Enter your admin email address. If it belongs to an active admin
+          account, we'll send a verification code to it.</p>
+        <div class="form-group">
+          <label for="fpEmail">Email</label>
+          <input type="email" id="fpEmail" autocomplete="username" required>
+        </div>
+        <button type="button" class="btn btn-primary" id="fpRequestBtn">
+          <span id="fpRequestBtnText">Send Verification Code</span>
+          <span id="fpRequestSpinner" class="spinner hidden"></span>
+        </button>
+        <button type="button" class="btn btn-secondary" id="fpBackBtn1">Back to Login</button>
+      </div>
+
+      <div id="fpStep2" class="hidden">
+        <p class="hint" id="fpOtpHint">
+          If that email belongs to an active admin account, a code was just sent to it.
+          Enter it below along with your new password.
+        </p>
+        <div class="form-group">
+          <label for="fpOtp">Verification Code</label>
+          <input type="text" id="fpOtp" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+        </div>
+        <div class="form-group">
+          <label for="fpNewPassword">New Password</label>
+          <input type="password" id="fpNewPassword" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label for="fpConfirmPassword">Confirm New Password</label>
+          <input type="password" id="fpConfirmPassword" autocomplete="new-password">
+        </div>
+        <button type="button" class="btn btn-primary" id="fpConfirmBtn">
+          <span id="fpConfirmBtnText">Reset Password</span>
+          <span id="fpConfirmSpinner" class="spinner hidden"></span>
+        </button>
+        <button type="button" class="btn btn-secondary" id="fpBackBtn2">Back to Login</button>
+      </div>
+    </section>
+
+    <!-- ============ DASHBOARD ============ -->
+    <div id="dashboard" class="hidden">
+
+      <div class="dashboard-header">
+        <h2>Dashboard <span class="panel-subtitle" id="sessionInfo"></span></h2>
+        <div class="dashboard-actions">
+          <button type="button" class="btn btn-secondary" id="refreshBtn">Refresh</button>
+          <button type="button" class="btn btn-secondary" id="bookingsBtn">Bookings</button>
+          <button type="button" class="btn btn-secondary manage-bookings-only hidden" id="createBookingBtn">Create Booking</button>
+          <button type="button" class="btn btn-secondary blood-drawing-only hidden" id="bloodDrawingBtn">Blood Drawing</button>
+          <button type="button" class="btn btn-secondary ta-availability-only hidden" id="taAvailabilityBtn">TA Availability</button>
+          <button type="button" class="btn btn-secondary manage-roles-only hidden" id="manageRolesBtn">Manage Roles</button>
+          <button type="button" class="btn btn-secondary" id="postExpBtn">Post-Experiment Updates</button>
+          <button type="button" class="btn btn-secondary manage-slots-only hidden" id="bulkMriBtn">Add MRI Slots</button>
+          <button type="button" class="btn btn-secondary" id="combinationsBtn">Schedule Combinations</button>
+          <button type="button" class="btn btn-secondary" id="changePwBtn">Change Password</button>
+          <button type="button" class="btn btn-secondary hidden" id="manageAdminsBtn">Manage Admins</button>
+          <button type="button" class="btn btn-secondary hidden" id="recordsBtn">Records &amp; Audit</button>
+          <button type="button" class="btn btn-secondary hidden" id="emailTemplatesBtn">Email Templates</button>
+          <button type="button" class="btn btn-secondary hidden" id="calendarInvitesBtn">Calendar Invitations</button>
+          <button type="button" class="btn btn-secondary" id="logoutBtn">Log Out</button>
+        </div>
+      </div>
+
+      <!-- ---- Day 1 overview ---- -->
+      <section class="panel">
+        <h3>Day 1 Slots <span class="panel-subtitle">(today onward)</span></h3>
+        <div class="form-row filter-toolbar">
+          <div class="form-group">
+            <label for="day1Search">Search</label>
+            <input type="text" id="day1Search" placeholder="Slot ID, staff name/email, date&hellip;">
+          </div>
+          <div class="form-group">
+            <label for="day1StatusFilter">Status</label>
+            <select id="day1StatusFilter">
+              <option value="">All</option>
+              <option value="available">Available</option>
+              <option value="booked">Booked</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="day1SortBy">Sort by</label>
+            <select id="day1SortBy">
+              <option value="date">Date/Time</option>
+              <option value="slotID">Slot ID</option>
+              <option value="assignedStaffName">Assigned Staff</option>
+              <option value="language">Language</option>
+              <option value="creatorName">Created By</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="day1SortDir">Order</label>
+            <select id="day1SortDir">
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </div>
+        </div>
+        <div id="day1OverviewLoading" class="loading">Loading…</div>
+        <p class="empty-message hidden" id="day1EmptyMsg">No Day 1 slots from today onward.</p>
+        <div class="table-scroll"><table class="slot-table hidden" id="day1Table">
+          <thead><tr><th>Slot ID</th><th>Date</th><th>Start</th><th>End</th><th>MRI Slot</th><th>Assigned Staff</th><th>Language</th><th>Created By</th><th>Status</th><th></th></tr></thead>
+          <tbody id="day1TableBody"></tbody>
+        </table></div>
+      </section>
+
+      <!-- ---- Day 2 overview ---- -->
+      <section class="panel">
+        <h3>Day 2 Slots <span class="panel-subtitle">(today onward)</span></h3>
+        <div class="form-row filter-toolbar">
+          <div class="form-group">
+            <label for="day2Search">Search</label>
+            <input type="text" id="day2Search" placeholder="Slot ID, staff name/email, date&hellip;">
+          </div>
+          <div class="form-group">
+            <label for="day2StatusFilter">Status</label>
+            <select id="day2StatusFilter">
+              <option value="">All</option>
+              <option value="available">Available</option>
+              <option value="booked">Booked</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="day2SortBy">Sort by</label>
+            <select id="day2SortBy">
+              <option value="date">Date/Time</option>
+              <option value="slotID">Slot ID</option>
+              <option value="assignedStaffName">Assigned Staff</option>
+              <option value="language">Language</option>
+              <option value="creatorName">Created By</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="day2SortDir">Order</label>
+            <select id="day2SortDir">
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </div>
+        </div>
+        <div id="day2OverviewLoading" class="loading">Loading…</div>
+        <p class="empty-message hidden" id="day2EmptyMsg">No Day 2 slots from today onward.</p>
+        <div class="table-scroll"><table class="slot-table hidden" id="day2Table">
+          <thead><tr><th>Slot ID</th><th>Date</th><th>Start</th><th>End</th><th>Assigned Staff</th><th>Language</th><th>Created By</th><th>Status</th><th></th></tr></thead>
+          <tbody id="day2TableBody"></tbody>
+        </table></div>
+      </section>
+
+      <!-- ---- MRI slots: the pool + entry point into schedule building ---- -->
+      <section class="panel">
+        <h3>MRI Slots <span class="panel-subtitle">(today onward)</span></h3>
+        <p class="hint">
+          Pick a Day 1 staff member for an available MRI slot, then click
+          <strong>Add to Schedule</strong> to derive the Day 1 slot from it and choose
+          compatible Day 2 slot(s). The staff dropdown lists <strong>every active
+          admin</strong> (Main Admin included) plus any extra people in the
+          <strong>Staff</strong> sheet. To push several MRI slots at once, tick their
+          checkboxes below and click <strong>Push Selected to Schedule</strong> — each
+          gets the same configure-then-push flow as <strong>Add MRI Slots</strong>, in a
+          single transaction.
+        </p>
+        <div class="form-row filter-toolbar">
+          <div class="form-group">
+            <label for="mriSearch">Search</label>
+            <input type="text" id="mriSearch" placeholder="Slot ID, staff name/email, date&hellip;">
+          </div>
+          <div class="form-group">
+            <label for="mriStatusFilter">Status</label>
+            <select id="mriStatusFilter">
+              <option value="">All</option>
+              <option value="available">Available</option>
+              <option value="booked">Used in schedule</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="mriSortBy">Sort by</label>
+            <select id="mriSortBy">
+              <option value="date">Date/Time</option>
+              <option value="slotID">Slot ID</option>
+              <option value="day1StaffName">Day 1 Staff</option>
+              <option value="day2StaffName">Day 2 Staff</option>
+              <option value="createdBy">Created By</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="mriSortDir">Order</label>
+            <select id="mriSortDir">
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </div>
+        </div>
+        <div id="mriOverviewLoading" class="loading">Loading…</div>
+        <p class="empty-message hidden" id="mriEmptyMsg">No MRI slots from today onward.</p>
+        <div class="manage-slots-only" style="margin-bottom: 8px;">
+          <button type="button" class="btn btn-secondary" id="mriPushSelectedBtn" disabled>Push Selected to Schedule</button>
+        </div>
+        <div class="table-scroll"><table class="slot-table hidden" id="mriTable">
+          <thead><tr>
+            <th class="manage-slots-only"></th>
+            <th>Slot ID</th><th>Date</th><th>Start</th><th>Duration</th><th>End</th>
+            <th>Day 1 Staff</th><th>Day 2 Staff</th><th>Created By</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="mriTableBody"></tbody>
+        </table></div>
+
+        <div class="subform manage-slots-only">
+          <h4>Create MRI Slots</h4>
+          <p class="hint">
+            MRI slots are only created in bulk, via <strong>Add MRI Slots</strong> above — this
+            keeps every MRI slot going through the same overlap/conflict checks and, if you choose,
+            lets you push it straight into a Day 1/Day 2 schedule in the same step.
+          </p>
+        </div>
+      </section>
+
+      <!-- ---- Independent Day 2 creation (round 10: single-slot form removed, bulk-only) ---- -->
+      <section class="panel manage-slots-only">
+        <h3>Add Day 2 Slots</h3>
+        <p class="hint">
+          Add one or more Day 2 slots without building a new MRI/Day 1 schedule. Each row must be
+          <strong>22–26 hours after at least one existing available Day 1 slot</strong>, and must
+          not conflict with any MRI, Day 1, or Day 2 slot (booked or unbooked) — validated when you
+          click Create All. Assigned Staff is required per row.
+        </p>
+        <div id="bulkDay2Error" class="banner banner-error hidden"></div>
+        <div id="bulkDay2Success" class="banner banner-success hidden"></div>
+        <div class="table-scroll"><table class="slot-table" id="bulkDay2Table">
+          <thead><tr><th>Date</th><th>Start Time</th><th>Duration (min)</th><th>Assigned Staff</th><th>Language</th><th></th></tr></thead>
+          <tbody id="bulkDay2TableBody"></tbody>
+        </table></div>
+        <button type="button" class="btn btn-secondary" id="bulkDay2AddRowBtn">Add Row</button>
+        <button type="button" class="btn btn-primary" id="bulkDay2SaveBtn">Create All Day 2 Slots</button>
+      </section>
+
+    </div>
+
+    <!-- ============ SCHEDULE BUILDER MODAL (MRI -> Day 1 -> Day 2) ============ -->
+    <div class="modal-overlay hidden" id="scheduleModalOverlay">
+      <div class="modal modal-schedule">
+        <h3>Build Schedule</h3>
+        <p id="scheduleModalMriText" class="hint"></p>
+
+        <div id="scheduleModalError" class="banner banner-error hidden"></div>
+
+        <div class="subform">
+          <h4>Day 1 (derived from the MRI slot)</h4>
+          <p class="hint">
+            Day 1 runs from <em>MRI Start − Time Before MRI</em> until <em>MRI End</em>.
+            Editing the MRI duration moves the MRI end time, so Day 1's end time
+            follows automatically.
+          </p>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="schedTimeBeforeMri">Time Before MRI (minutes)</label>
+              <input type="number" id="schedTimeBeforeMri" min="1" step="5">
+            </div>
+            <div class="form-group">
+              <label for="schedMriDuration">MRI Duration (minutes)</label>
+              <input type="number" id="schedMriDuration" min="1" step="5">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Day 1 Date (calculated)</label>
+              <input type="text" id="schedDay1DateDisplay" readonly>
+            </div>
+            <div class="form-group">
+              <label>Day 1 Start (calculated)</label>
+              <input type="text" id="schedDay1StartDisplay" readonly>
+            </div>
+            <div class="form-group">
+              <label>Day 1 End = MRI End (calculated)</label>
+              <input type="text" id="schedDay1EndDisplay" readonly>
+            </div>
+          </div>
+          <div id="schedMriResizeMsg" class="tag tag-pending hidden"></div>
+          <div id="schedDay1CollisionMsg" class="tag tag-bad hidden"></div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="schedDay1StaffSelect">Assigned Staff (Day 1)</label>
+              <select id="schedDay1StaffSelect"></select>
+            </div>
+            <div class="form-group">
+              <label for="schedLanguageSelect">Day 1 Session Language</label>
+              <select id="schedLanguageSelect"></select>
+            </div>
+          </div>
+          <div id="schedStaffConflictBox" class="banner banner-error hidden"></div>
+          <div id="schedMriOverlapBox" class="warning-box hidden">
+            <strong>This MRI slot overlaps these scheduled experiments:</strong>
+            <ul id="schedMriOverlapList"></ul>
+            <span class="hint">Allowed — but the assigned staff must not already be busy on them.</span>
+          </div>
+        </div>
+
+        <div class="subform">
+          <h4>Day 2 — available slots in the 22–26h window</h4>
+          <div id="schedDay2Loading" class="loading hidden">Checking available Day 2 slots…</div>
+          <p class="empty-message hidden" id="schedDay2EmptyMsg">
+            No existing Day 2 slots fall in this window yet — add a new one below.
+          </p>
+          <div id="schedDay2ExistingList"></div>
+
+          <button type="button" class="btn btn-link" id="schedAddDay2RowBtn">+ Add a new Day 2 slot for this window</button>
+          <div id="schedNewDay2RowsContainer"></div>
+
+          <p class="hint">
+            Each selected Day 2 slot gets its <strong>own</strong> assigned staff member,
+            chosen independently of Day 1. Everyone involved (all admins plus the
+            assigned staff) receives exactly one email; if the same person covers both
+            days, their assignments arrive in a single combined message. No calendar
+            invitations are sent — sessions are added to the owner's Google Calendar.
+          </p>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="scheduleCancelBtn">Cancel</button>
+          <button type="button" class="btn btn-primary" id="scheduleSaveBtn" disabled>
+            <span id="scheduleSaveBtnText">Save Schedule</span>
+            <span id="scheduleSaveSpinner" class="spinner hidden"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ REASSIGN STAFF MODAL ============ -->
+    <!-- ============ EDIT SCHEDULE MODAL (round 12 — replaces standalone Reassign Staff;
+         round 15, #3 — also absorbs the old separate "Edit Slot" date/time/language modal,
+         so every edit function for a schedule lives in one place) ============ -->
+    <div class="modal-overlay hidden" id="editScheduleModalOverlay">
+      <div class="modal modal-wide">
+        <h3>Edit Schedule</h3>
+        <p id="editScheduleModalText" class="hint"></p>
+        <div id="editScheduleError" class="banner banner-error hidden"></div>
+
+        <div id="editScheduleDay1Section" class="hidden">
+          <h4>Day 1</h4>
+          <p id="editScheduleDay1Text" class="hint"></p>
+          <p class="hint">Day 1's time is derived from its linked MRI slot and can't be changed here —
+            delete and recreate the schedule from the MRI slot (or resize the MRI slot while pushing to
+            schedule) to move it. Session Language and the assigned staff member can be changed below.</p>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="editScheduleDay1Staff">Assigned Day 1 Staff</label>
+              <select id="editScheduleDay1Staff"></select>
+            </div>
+            <div class="form-group">
+              <label for="editScheduleDay1Language">Session Language</label>
+              <select id="editScheduleDay1Language"></select>
+            </div>
+          </div>
+        </div>
+
+        <div id="editScheduleDay2Section" class="hidden">
+          <h4>Day 2</h4>
+          <p id="editScheduleDay2Text" class="hint"></p>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="editScheduleDay2Staff">Assigned Day 2 Staff</label>
+              <select id="editScheduleDay2Staff"></select>
+            </div>
+            <div class="form-group">
+              <label for="editScheduleDay2Language">Session Language</label>
+              <select id="editScheduleDay2Language"></select>
+            </div>
+          </div>
+          <div id="editScheduleDay2TimeFields" class="form-row">
+            <div class="form-group">
+              <label for="editScheduleDay2Date">Date <span class="panel-subtitle">(unbooked only)</span></label>
+              <input type="date" id="editScheduleDay2Date">
+            </div>
+            <div class="form-group">
+              <label for="editScheduleDay2Start">Start Time</label>
+              <input type="time" id="editScheduleDay2Start">
+            </div>
+            <div class="form-group">
+              <label for="editScheduleDay2Duration">Duration (minutes)</label>
+              <input type="number" id="editScheduleDay2Duration" min="1" step="5">
+            </div>
+          </div>
+        </div>
+
+        <div id="editScheduleBdSection" class="hidden">
+          <h4>Blood Drawing</h4>
+          <p id="editScheduleBdText" class="hint"></p>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="editScheduleBdStaff">Assigned Blood Drawing Staff</label>
+              <select id="editScheduleBdStaff"></select>
+            </div>
+            <div class="form-group">
+              <label for="editScheduleBdTA">Assigned Technical Assistant(s) <span class="panel-subtitle">(Ctrl/Cmd-click for multiple)</span></label>
+              <select id="editScheduleBdTA" multiple size="4"></select>
+            </div>
+          </div>
+        </div>
+
+        <p class="hint">
+          Every change is checked against all existing commitments (MRI, Day 1, Day 2, and Blood
+          Drawing) before saving — if any change conflicts, nothing in this panel is saved and the
+          previous assignments stay in place. Everyone affected gets one combined email covering
+          everything that changed for them.
+        </p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="editScheduleCancelBtn">Cancel</button>
+          <button type="button" class="btn btn-primary" id="editScheduleSaveBtn">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CREATE BOOKING MODAL (Admin Booking Portal — spec section 3) ============ -->
+    <div class="modal-overlay hidden" id="createBookingModalOverlay">
+      <div class="modal modal-wide">
+        <h3>Create Booking (on behalf of a participant)</h3>
+        <p class="hint">Email is optional — if left blank, no confirmation email is sent, but the
+          booking (ID, passcode, calendar entries, admin notification) is still created normally.</p>
+        <div id="createBookingError" class="banner banner-error hidden"></div>
+        <div id="createBookingSuccess" class="banner banner-success hidden"></div>
+        <div class="form-row filter-toolbar">
+          <div class="form-group">
+            <label for="cbLanguageSelect">1. Language Preference <span class="panel-subtitle">(choose first \u2014 filters the slots below)</span></label>
+            <select id="cbLanguageSelect">
+              <option value="any">Any / No preference</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="cbDay1Select">Day 1 Slot (available)</label>
+            <select id="cbDay1Select"></select>
+          </div>
+          <div class="form-group">
+            <label for="cbDay2Select">Day 2 Slot (compatible, available)</label>
+            <select id="cbDay2Select"></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="cbTitleSelect">Title</label>
+            <select id="cbTitleSelect">
+              <option value="">Select…</option>
+              <option>Mr.</option><option>Ms.</option><option>Mrs.</option>
+              <option>Mx.</option><option>Dr.</option><option>Prof.</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="cbGenderSelect">Gender</label>
+            <select id="cbGenderSelect">
+              <option value="">Select…</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="cbFirstName">First Name</label>
+            <input type="text" id="cbFirstName">
+          </div>
+          <div class="form-group">
+            <label for="cbLastName">Last Name</label>
+            <input type="text" id="cbLastName">
+          </div>
+          <div class="form-group">
+            <label for="cbEmail">Email (optional)</label>
+            <input type="email" id="cbEmail">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="cbComments">Comments (optional)</label>
+          <textarea id="cbComments" rows="2"></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="cbCancelBtn">Cancel</button>
+          <button type="button" class="btn btn-primary" id="cbSaveBtn">
+            <span id="cbSaveBtnText">Create Booking</span>
+            <span id="cbSaveSpinner" class="spinner hidden"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ BLOOD DRAWING PORTAL (spec sections 4, 8, 11) ============ -->
+    <div class="modal-overlay hidden" id="bloodDrawingModalOverlay">
+      <div class="modal modal-wide">
+        <h3>Blood Drawing Schedule Portal</h3>
+        <p class="hint">Blood Drawing slots may only be assigned to Technical Assistants (TAs). A 30-minute
+          slot is created automatically whenever a Day 1 slot is created; add more here as needed.</p>
+        <div id="bdError" class="banner banner-error hidden"></div>
+        <div id="bdSuccess" class="banner banner-success hidden"></div>
+
+        <div class="form-row filter-toolbar">
+          <div class="form-group">
+            <label for="bdSearch">Search</label>
+            <input type="text" id="bdSearch" placeholder="Slot ID, staff, TA, date&hellip;">
+          </div>
+          <div class="form-group">
+            <label for="bdStatusFilter">Status</label>
+            <select id="bdStatusFilter">
+              <option value="">All</option>
+              <option value="available">Available</option>
+              <option value="booked">Booked</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="bdSortBy">Sort by</label>
+            <select id="bdSortBy">
+              <option value="date">Date/Time</option>
+              <option value="slotID">Slot ID</option>
+              <option value="assignedStaffLabel">Assigned Staff</option>
+              <option value="assignedTALabel">Assigned TA</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="bdSortDir">Order</label>
+            <select id="bdSortDir">
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-scroll"><table class="slot-table" id="bdTable">
+          <thead><tr><th>Slot ID</th><th>Date</th><th>Start</th><th>End</th><th>Linked Day 1</th>
+            <th>Assigned Staff</th><th>Assigned TA</th><th>Participant</th><th>Status</th><th></th></tr></thead>
+          <tbody id="bdTableBody"></tbody>
+        </table></div>
+
+        <div class="subform manage-blood-drawing-schedules-only" style="margin-top: 16px;">
+          <h4>Add Blood Drawing Slot(s)</h4>
+          <p class="hint">
+            Add one or more rows, then create them all at once. Assigned Staff is
+            <strong>optional</strong> — leave it blank to create an unstaffed slot; staff can be
+            added or changed any time afterwards via <strong>Edit</strong> on the row.
+          </p>
+          <div id="bdBulkError" class="banner banner-error hidden"></div>
+          <div id="bdBulkSuccess" class="banner banner-success hidden"></div>
+          <div class="table-scroll"><table class="slot-table" id="bdBulkTable">
+            <thead><tr><th>Date</th><th>Start Time</th><th>Duration (min)</th><th>Assigned Staff (optional)</th><th></th></tr></thead>
+            <tbody id="bdBulkTableBody"></tbody>
+          </table></div>
+          <button type="button" class="btn btn-secondary" id="bdBulkAddRowBtn">Add Row</button>
+          <button type="button" class="btn btn-primary" id="bdBulkSaveBtn">Create All Slots</button>
+        </div>
+
+        <div class="subform book-blood-drawing-only" style="margin-top: 16px;">
+          <h4>Appointment selection: Blood Drawing Availability</h4>
+          <p class="hint">Check the slots you're available for, then Submit — every change is applied
+            together in one operation and one summary email is sent (per the Email Control Matrix).
+            Saving a slot you have no Booking ID for yet generates one automatically. The grid below
+            shows everyone's current availability.</p>
+          <div id="taBdAvailError" class="banner banner-error hidden"></div>
+          <div id="taBdAvailSuccess" class="banner banner-success hidden"></div>
+
+          <div class="ta-grid-nav">
+            <button type="button" class="btn btn-secondary btn-small" id="taBdGridScrollLeft" aria-label="Scroll earlier">&#8592;</button>
+            <button type="button" class="btn btn-secondary btn-small" id="taBdGridScrollRight" aria-label="Scroll later">&#8594;</button>
+          </div>
+          <div class="ta-grid-scroll" id="taBdGridScroll">
+            <table class="ta-grid-table" id="taBdGridTable">
+              <thead>
+                <tr id="taBdGridMonthRow"></tr>
+                <tr id="taBdGridDayRow"></tr>
+                <tr id="taBdGridTimeRow"></tr>
+              </thead>
+              <tbody>
+                <tr id="taBdGridNameRow"></tr>
+                <tr id="taBdGridSubmitRow"></tr>
+                <tr class="ta-grid-spacer-row"><td colspan="1"></td></tr>
+              </tbody>
+              <tbody id="taBdGridPeopleBody"></tbody>
+              <tfoot>
+                <tr id="taBdGridTotalsRow"></tr>
+              </tfoot>
+            </table>
+          </div>
+          <p id="taBdGridEmpty" class="hint hidden">No upcoming Blood Drawing slots yet.</p>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="bdCloseBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ EDIT BLOOD DRAWING SLOT (spec round 4, #1) ============ -->
+    <div class="modal-overlay hidden" id="bdEditModalOverlay">
+      <div class="modal modal-wide">
+        <h3>Edit Blood Drawing Slot</h3>
+        <p class="hint">Change the date, time, assigned staff, or assigned Technical Assistant(s).
+          All changes update the sheet and calendar and notify everyone affected.</p>
+        <div id="bdEditError" class="banner banner-error hidden"></div>
+        <div id="bdEditSuccess" class="banner banner-success hidden"></div>
+        <input type="hidden" id="bdEditSlotID">
+        <div class="form-row">
+          <div class="form-group"><label for="bdEditDate">Date</label><input type="date" id="bdEditDate"></div>
+          <div class="form-group"><label for="bdEditStart">Start Time</label><input type="time" id="bdEditStart"></div>
+          <div class="form-group"><label for="bdEditEnd">End Time</label><input type="time" id="bdEditEnd"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label for="bdEditStaffSelect">Assigned Staff</label><select id="bdEditStaffSelect"></select></div>
+          <div class="form-group"><label for="bdEditTASelect">Technical Assistant(s) <span class="panel-subtitle">(Ctrl/Cmd-click for multiple)</span></label><select id="bdEditTASelect" multiple size="4"></select></div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-primary" id="bdEditSaveBtn">Save Changes</button>
+          <button type="button" class="btn btn-secondary" id="bdEditCancelBtn">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TA AVAILABILITY PORTAL (spec section 11) ============ -->
+    <div class="modal-overlay hidden" id="taAvailModalOverlay">
+      <div class="modal modal-wide">
+        <h3>TA Availability</h3>
+        <div id="taAvailError" class="banner banner-error hidden"></div>
+        <div id="taAvailSuccess" class="banner banner-success hidden"></div>
+
+        <div class="subform ta-self-service-only">
+          <h4>Submit / Update Your Availability</h4>
+          <p class="hint">Only visible to Technical Assistants — submits under your own account.</p>
+          <div class="form-row">
+            <div class="form-group"><label for="taAvailDate">Date</label><input type="date" id="taAvailDate"></div>
+            <div class="form-group"><label for="taAvailStart">Start Time</label><input type="time" id="taAvailStart"></div>
+            <div class="form-group"><label for="taAvailEnd">End Time</label><input type="time" id="taAvailEnd"></div>
+          </div>
+          <div class="form-group"><label for="taAvailNotes">Notes (optional)</label><input type="text" id="taAvailNotes"></div>
+          <button type="button" class="btn btn-primary" id="taAvailSaveBtn">Save Availability</button>
+        </div>
+
+        <div class="subform view-ta-availability-only manage-ta-availability-only" style="margin-top: 16px;">
+          <h4>All TA Availability <span class="panel-subtitle">(today onward)</span></h4>
+          <div class="table-scroll"><table class="slot-table" id="taAvailTable">
+            <thead><tr><th>TA</th><th>Date</th><th>Start</th><th>End</th><th>Notes</th></tr></thead>
+            <tbody id="taAvailTableBody"></tbody>
+          </table></div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="taAvailCloseBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ MANAGE ROLES MODAL (MainAdmin only — spec section 10) ============ -->
+    <div class="modal-overlay hidden" id="manageRolesModalOverlay">
+      <div class="modal modal-wide">
+        <h3>Manage Roles &amp; Permissions</h3>
+        <p class="hint">Permissions here take effect immediately for every admin with that role.</p>
+        <div id="rolesError" class="banner banner-error hidden"></div>
+        <div id="rolesSuccess" class="banner banner-success hidden"></div>
+        <div id="rolesGrid"></div>
+
+        <hr style="margin: 20px 0;">
+        <h3>Task Management</h3>
+        <p class="hint">Controls which roles may perform each task, layered on top of the permissions above.</p>
+        <div id="tasksGrid"></div>
+
+        <div class="subform" style="margin-top: 16px;">
+          <h4>Create New Task</h4>
+          <div class="form-row">
+            <div class="form-group"><label for="newTaskName">Task Name</label><input type="text" id="newTaskName"></div>
+          </div>
+          <div id="newTaskChecklist"></div>
+          <button type="button" class="btn btn-primary" id="createTaskBtn">Create Task</button>
+        </div>
+
+        <hr style="margin: 20px 0;">
+        <h3>Email Notification Settings</h3>
+        <p class="hint">For each event, choose which recipient groups receive the notification. Editable at any time.</p>
+        <div id="notifMatrixGrid"></div>
+
+        <hr style="margin: 20px 0;">
+        <h3>Scheduling Rules</h3>
+        <p class="hint">Controls which experiment types may overlap. "Allowed" overlaps still require different
+          staff (and different TAs for Blood Drawing); "not allowed" overlaps are blocked outright. The
+          scheduling engine reads these rules everywhere — no code changes needed.</p>
+        <div id="schedulingRulesError" class="banner banner-error hidden"></div>
+        <div id="schedulingRulesSuccess" class="banner banner-success hidden"></div>
+        <div class="table-scroll"><table class="slot-table" id="schedulingRulesTable">
+          <thead><tr><th>Experiment Type A</th><th>Experiment Type B</th><th>Overlap Allowed</th></tr></thead>
+          <tbody id="schedulingRulesTableBody"></tbody>
+        </table></div>
+        <div class="subform" style="margin-top: 12px;">
+          <h4>Add Experiment Type</h4>
+          <div class="form-row">
+            <div class="form-group"><label for="newSchedTypeName">Type Name</label><input type="text" id="newSchedTypeName"></div>
+          </div>
+          <button type="button" class="btn btn-primary" id="addSchedTypeBtn">Add Type</button>
+        </div>
+
+        <div class="subform" style="margin-top: 16px;">
+          <h4>Create New Role</h4>
+          <div class="form-row">
+            <div class="form-group"><label for="newRoleName">Role Name</label><input type="text" id="newRoleName"></div>
+          </div>
+          <div id="newRoleChecklist"></div>
+          <button type="button" class="btn btn-primary" id="createRoleBtn">Create Role</button>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="rolesCloseBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ POST-EXPERIMENT UPDATES (spec round 2, #10, #11) ============ -->
+    <div class="modal-overlay hidden" id="postExpModalOverlay">
+      <div class="modal modal-wide">
+        <h3>Post-Experiment Updates</h3>
+        <p class="hint">Update completion status per participant. Saving here sends no emails or notifications.</p>
+        <div id="postExpError" class="banner banner-error hidden"></div>
+        <div id="postExpSuccess" class="banner banner-success hidden"></div>
+        <div class="table-scroll"><table class="slot-table" id="postExpTable">
+          <thead><tr><th>Booking ID</th><th>Participant</th><th>Day 1</th><th>Blood Drawing</th>
+            <th>MRI</th><th>Day 2</th><th>Comments</th><th></th></tr></thead>
+          <tbody id="postExpTableBody"></tbody>
+        </table></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="postExpCloseBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ BULK SCHEDULING (spec round 3, #1, #2) ============ -->
+    <div class="modal-overlay hidden" id="bulkMriModalOverlay">
+      <div class="modal modal-wide">
+        <h3 id="bulkMriModalTitle">Add MRI Slots</h3>
+        <p class="hint" id="bulkMriModalIntro">Add multiple MRI slots, validate them together, then save all at once. After saving,
+          configure each one using the same scheduling dialog as individual scheduling, then push them
+          all into the experiment schedule in a single transaction.</p>
+        <div id="bulkMriError" class="banner banner-error hidden"></div>
+        <div id="bulkMriSuccess" class="banner banner-success hidden"></div>
+
+        <div id="bulkMriStep1Section">
+          <h4>1. MRI Slots</h4>
+          <div class="table-scroll"><table class="slot-table" id="bulkMriTable">
+            <thead><tr><th>Date</th><th>Start Time</th><th>MRI Duration (min)</th><th>Time Before MRI (min)</th>
+              <th>Validation</th><th></th></tr></thead>
+            <tbody id="bulkMriTableBody"></tbody>
+          </table></div>
+          <button type="button" class="btn btn-secondary" id="bulkMriAddRowBtn">Add MRI Slot</button>
+          <button type="button" class="btn btn-secondary" id="bulkMriValidateBtn">Validate All</button>
+          <button type="button" class="btn btn-primary" id="bulkMriSaveBtn" disabled>Save All MRI Slots</button>
+        </div>
+
+        <div id="bulkMriPushSection" class="hidden" style="margin-top: 20px;">
+          <h4 id="bulkMriPushHeading">2. Configure &amp; Push to Schedule</h4>
+          <p class="hint">Each MRI slot is configured with the full individual scheduling dialog &mdash; the same
+            Day 1/Day 2 options, compatible Day 2 slot selection, staff assignment, validation messages,
+            conflicts and preview.</p>
+          <div class="table-scroll"><table class="slot-table" id="bulkMriPushTable">
+            <thead><tr><th></th><th>MRI Slot</th><th>Configuration</th><th></th></tr></thead>
+            <tbody id="bulkMriPushTableBody"></tbody>
+          </table></div>
+          <button type="button" class="btn btn-primary" id="bulkMriPushBtn">Push Selected to Schedule</button>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="bulkMriCloseBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SCHEDULE COMBINATIONS (spec round 4, #3) ============ -->
+    <div class="modal-overlay hidden" id="combinationsModalOverlay">
+      <div class="modal modal-wide">
+        <h3>Compatible Schedule Combinations</h3>
+        <p class="hint">All valid Day 1 + Day 2 combinations, respecting the compatibility window.
+          Export downloads 3 participant-facing PDFs of AVAILABLE slots only, with no staff names:
+          one English-only, one German-only, and one with no language restriction (matched against
+          each slot's own Session Language).</p>
+        <div id="combinationsError" class="banner banner-error hidden"></div>
+        <div id="combinationsSuccess" class="banner banner-success hidden"></div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="combinationsScope">Scope</label>
+            <select id="combinationsScope">
+              <option value="available">Available (unbooked) slots only</option>
+              <option value="all">All slots (including booked)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="combinationsFilter">Filter <span class="panel-subtitle">(slot ID, staff, date&hellip;)</span></label>
+            <input type="text" id="combinationsFilter" placeholder="Type to filter&hellip;">
+          </div>
+        </div>
+        <button type="button" class="btn btn-secondary" id="combinationsRefreshBtn">Preview</button>
+        <button type="button" class="btn btn-primary" id="combinationsPdfBtn">Export 3 PDFs (EN / DE / Any)</button>
+
+        <p id="combinationsCount" class="hint" style="margin-top:12px;"></p>
+        <div class="table-scroll">
+          <table class="slot-table" id="combinationsTable">
+            <thead><tr><th>#</th><th>Day 1</th><th>Day 1 Staff</th><th>MRI</th><th>Day 2</th><th>Day 2 Staff</th></tr></thead>
+            <tbody id="combinationsTableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="combinationsCloseBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ RECORDS & AUDIT (soft-delete browser — spec round 5, #5) ============ -->
+    <div class="modal-overlay hidden" id="recordsModalOverlay">
+      <div class="modal modal-wide">
+        <h3>Records &amp; Audit</h3>
+        <p class="hint">Browse active, deleted, or all records. Deleted records are preserved for audit and can be restored.</p>
+        <div id="recordsError" class="banner banner-error hidden"></div>
+        <div id="recordsSuccess" class="banner banner-success hidden"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="recordsSheetSelect">Record Type</label>
+            <select id="recordsSheetSelect">
+              <option value="MRI">MRI Slots</option>
+              <option value="DAY1">Day 1 Slots</option>
+              <option value="DAY2">Day 2 Slots</option>
+              <option value="BLOOD_DRAWING">Blood Drawing Slots</option>
+              <option value="BOOKINGS">Bookings</option>
+              <option value="TA_AVAILABILITY">TA Availability</option>
+              <option value="ADMINS">Admin Accounts</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="recordsScopeSelect">Show</label>
+            <select id="recordsScopeSelect">
+              <option value="active">Active Records</option>
+              <option value="deleted">Deleted Records</option>
+              <option value="all">All Records</option>
+            </select>
+          </div>
+        </div>
+        <button type="button" class="btn btn-secondary" id="recordsRefreshBtn">Load</button>
+        <p id="recordsCount" class="hint" style="margin-top:12px;"></p>
+        <div class="table-scroll"><table class="slot-table" id="recordsTable">
+          <thead><tr id="recordsTableHead"></tr></thead>
+          <tbody id="recordsTableBody"></tbody>
+        </table></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="recordsCloseBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ EMAIL TEMPLATES (spec round 6) ============ -->
+    <div class="modal-overlay hidden" id="emailTemplatesModalOverlay">
+      <div class="modal modal-wide">
+        <h3>Email Templates</h3>
+        <p class="hint">Edit the subject and body of every system email in German and English. Use
+          <code>{{PlaceholderName}}</code> to insert dynamic values.</p>
+        <div id="emailTemplatesError" class="banner banner-error hidden"></div>
+        <div id="emailTemplatesSuccess" class="banner banner-success hidden"></div>
+
+        <div class="form-group">
+          <label for="etTemplateSelect">Template</label>
+          <select id="etTemplateSelect"></select>
+        </div>
+
+        <p class="hint">Available placeholders: <span id="etPlaceholderList"></span></p>
+
+        <div class="form-row">
+          <div class="form-group"><label for="etSubjectDe">Subject (DE)</label><input type="text" id="etSubjectDe"></div>
+          <div class="form-group"><label for="etSubjectEn">Subject (EN)</label><input type="text" id="etSubjectEn"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label for="etBodyDe">Body (DE)</label><textarea id="etBodyDe" rows="8"></textarea></div>
+          <div class="form-group"><label for="etBodyEn">Body (EN)</label><textarea id="etBodyEn" rows="8"></textarea></div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-primary" id="etSaveBtn">Save Template</button>
+          <button type="button" class="btn btn-secondary" id="etResetBtn">Reset to Default</button>
+          <button type="button" class="btn btn-secondary" id="emailTemplatesCloseBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CALENDAR INVITATIONS (spec round 6) ============ -->
+    <div class="modal-overlay hidden" id="calendarInvitesModalOverlay">
+      <div class="modal modal-wide">
+        <h3>Calendar Invitations</h3>
+        <p class="hint">For each activity, choose which recipient groups are invited to the calendar event.
+          Changes apply immediately to all future invitations.</p>
+        <div id="calendarInvitesError" class="banner banner-error hidden"></div>
+        <div id="calendarInvitesSuccess" class="banner banner-success hidden"></div>
+        <div id="calendarInvitesGrid"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="calendarInvitesCloseBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ MANAGE ADMINS MODAL ============ -->
+    <div class="modal-overlay hidden" id="adminsModalOverlay">
+      <div class="modal modal-wide">
+        <h3>Manage Admins</h3>
+        <div id="adminsModalError" class="banner banner-error hidden"></div>
+        <div id="adminsModalSuccess" class="banner banner-success hidden"></div>
+
+        <div id="adminsLoading" class="loading">Loading…</div>
+        <div class="table-scroll"><table class="slot-table hidden" id="adminsTable">
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
+          <tbody id="adminsTableBody"></tbody>
+        </table></div>
+
+        <div class="subform" style="margin-top: 18px;">
+          <h4>Create New Admin</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="newAdminName">Name</label>
+              <input type="text" id="newAdminName">
+            </div>
+            <div class="form-group">
+              <label for="newAdminEmail">Email</label>
+              <input type="email" id="newAdminEmail">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="newAdminRole">Role</label>
+              <select id="newAdminRole"></select>
+            </div>
+            <div class="form-group">
+              <label for="newAdminPassword">Initial Password</label>
+              <input type="text" id="newAdminPassword" autocomplete="off">
+            </div>
+          </div>
+          <p class="hint">
+            The new admin is emailed their login details and should change this
+            password immediately after their first login.
+          </p>
+          <button type="button" class="btn btn-primary" id="createAdminBtn">Create Admin</button>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="adminsCloseBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ BOOKINGS MODAL ============ -->
+    <div class="modal-overlay hidden" id="bookingsModalOverlay">
+      <div class="modal modal-wide">
+        <h3>Bookings</h3>
+        <div id="bookingsModalError" class="banner banner-error hidden"></div>
+        <div id="bookingsModalSuccess" class="banner banner-success hidden"></div>
+
+        <div id="bookingsLoading" class="loading">Loading…</div>
+        <p class="empty-message hidden" id="bookingsEmptyMsg">No bookings yet.</p>
+        <div class="table-scroll"><table class="slot-table hidden" id="bookingsTable">
+          <thead>
+            <tr>
+              <th>Booking ID</th><th>Passcode</th><th>Name</th><th>Email</th>
+              <th>Day 1</th><th>Day 2</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="bookingsTableBody"></tbody>
+        </table></div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="bookingsCloseBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ RESCHEDULE BOOKING MODAL ============ -->
+    <div class="modal-overlay hidden" id="bookingRescheduleModalOverlay">
+      <div class="modal modal-wide">
+        <h3>Reschedule Booking</h3>
+        <p id="bookingRescheduleModalText" class="hint"></p>
+        <div id="bookingRescheduleModalError" class="banner banner-error hidden"></div>
+
+        <div class="subform">
+          <h4>Day 1</h4>
+          <div id="bookingDay1Loading" class="loading">Loading…</div>
+          <div id="bookingDay1Options"></div>
+        </div>
+
+        <div class="subform">
+          <h4>Day 2</h4>
+          <div id="bookingDay2Loading" class="loading hidden">Loading…</div>
+          <div id="bookingDay2Options"></div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="bookingRescheduleCancelBtn">Cancel</button>
+          <button type="button" class="btn btn-primary" id="bookingRescheduleSaveBtn">
+            <span id="bookingRescheduleSaveBtnText">Save Reschedule</span>
+            <span id="bookingRescheduleSpinner" class="spinner hidden"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CANCEL BOOKING MODAL ============ -->
+    <div class="modal-overlay hidden" id="bookingCancelModalOverlay">
+      <div class="modal">
+        <h3>Cancel Booking</h3>
+        <p id="bookingCancelModalText" class="hint"></p>
+        <div id="bookingCancelModalError" class="banner banner-error hidden"></div>
+
+        <p class="hint">
+          Optionally record when the participant may be available again — the same
+          calendar-based step participants see when they cancel their own booking.
+        </p>
+        <div class="form-group">
+          <label for="bookingCancelAvailDate">Add a date they may be available</label>
+          <div class="inline-row">
+            <input type="date" id="bookingCancelAvailDate">
+            <button type="button" class="btn btn-secondary" id="bookingCancelAddDateBtn">Add</button>
+          </div>
+        </div>
+        <ul id="bookingCancelAvailList" class="avail-list"></ul>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="bookingCancelDontKnow"> Not known yet
+          </label>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="bookingCancelBackBtn">Back</button>
+          <button type="button" class="btn btn-primary btn-danger" id="bookingCancelConfirmBtn">
+            <span id="bookingCancelConfirmBtnText">Confirm Cancellation</span>
+            <span id="bookingCancelSpinner" class="spinner hidden"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CHANGE PASSWORD MODAL ============ -->
+    <div class="modal-overlay hidden" id="pwModalOverlay">
+      <div class="modal">
+        <h3>Change My Password</h3>
+
+        <div id="pwModalError" class="banner banner-error hidden"></div>
+
+        <div id="pwStep1">
+          <div class="form-group">
+            <label for="pwCurrent">Current Password</label>
+            <input type="password" id="pwCurrent" autocomplete="current-password">
+          </div>
+          <div class="form-group">
+            <label for="pwNew">New Password</label>
+            <input type="password" id="pwNew" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label for="pwConfirm">Confirm New Password</label>
+            <input type="password" id="pwConfirm" autocomplete="new-password">
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="pwCancelBtn1">Cancel</button>
+            <button type="button" class="btn btn-primary" id="pwRequestBtn">Send Verification Code</button>
+          </div>
+        </div>
+
+        <div id="pwStep2" class="hidden">
+          <p class="hint" id="pwOtpHint">
+            A 6-digit verification code was sent to your admin email address. Enter it
+            below to confirm the new password.
+          </p>
+          <div class="form-group">
+            <label for="pwOtp">Verification Code</label>
+            <input type="text" id="pwOtp" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="pwCancelBtn2">Cancel</button>
+            <button type="button" class="btn btn-primary" id="pwConfirmBtn">Confirm New Password</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ DELETE DAY 1 (ORPHAN WARNING) MODAL ============ -->
+    <div class="modal-overlay hidden" id="deleteDay1ModalOverlay">
+      <div class="modal">
+        <h3>Delete Day 1 Slot</h3>
+        <p id="deleteDay1ModalText"></p>
+        <ul id="deleteDay1OrphanList"></ul>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="deleteDay1CancelBtn">Cancel</button>
+          <button type="button" class="btn btn-primary btn-danger" id="deleteDay1ConfirmBtn">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ DELETE DAY 2 MODAL ============ -->
+    <div class="modal-overlay hidden" id="deleteDay2ModalOverlay">
+      <div class="modal">
+        <h3>Delete Day 2 Slot</h3>
+        <p id="deleteDay2ModalText"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="deleteDay2CancelBtn">Cancel</button>
+          <button type="button" class="btn btn-primary btn-danger" id="deleteDay2ConfirmBtn">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ BOOKED DAY 1 SLOT ACTION MODAL ============ -->
+    <div class="modal-overlay hidden" id="bookedActionModalOverlay">
+      <div class="modal">
+        <h3>Booked Slot — Choose an Action</h3>
+        <p id="bookedActionModalText"></p>
+        <p class="hint">
+          <strong>Unbook</strong> clears this booking and returns both slots to
+          Available for a future participant.<br>
+          <strong>Delete Completely</strong> permanently removes both slots and the
+          booking record.
+        </p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="bookedActionCancelBtn">Cancel</button>
+          <button type="button" class="btn btn-secondary" id="bookedActionUnbookBtn">Unbook</button>
+          <button type="button" class="btn btn-primary btn-danger" id="bookedActionDeleteBtn">Delete Completely</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <?!= include('AdminJavaScript'); ?>
+</body>
+</html>

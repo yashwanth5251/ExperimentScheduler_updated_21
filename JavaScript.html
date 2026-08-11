@@ -1,0 +1,760 @@
+<script>
+  /**
+   * ==========================================================================
+   *  JavaScript.html — Client-side logic for the Experiment Scheduling app
+   * ==========================================================================
+   *  Flow:
+   *   0. Participant chooses English or German — everything after this point
+   *      is rendered in that language, and the language code is sent to the
+   *      server with every call so slot dates/times, validation errors, and
+   *      the confirmation email all match.
+   *   1. Load & render available Day 1 slots.
+   *   2. On Day 1 pick, load & render compatible Day 2 slots (server computes
+   *      compatibility automatically from slot start times).
+   *   3. Collect participant details and submit the booking.
+   *   4. Show a translated confirmation screen with the experiment location.
+   * ==========================================================================
+   */
+
+  // ---------------------------------------------------------------------
+  // Static experiment location (mirrors CONFIG.LOCATION in Code.gs).
+  // Shown on the confirmation screen; the email version comes from the
+  // server so the two are easy to keep in sync — update both places if the
+  // location ever changes.
+  // ---------------------------------------------------------------------
+  var LOCATION = {
+    address: 'Brenneckestraße 6, 39118 Magdeburg',
+    mapsUrl: 'https://share.google/fGVtmqDfgzVR1vns8'
+  };
+
+  // ---------------------------------------------------------------------
+  // Translations for every UI string shown after the language is chosen.
+  // ---------------------------------------------------------------------
+  var I18N = {
+    en: {
+      headerTitle: 'Experiment Scheduling',
+      headerSubtitle: 'Book your two-day experiment session below.',
+      stepLabel1: 'Day 1', stepLabel2: 'Day 2', stepLabel3: 'Details',
+      day1Heading: 'Choose a Day 1 Slot',
+      day1Hint: 'Select an available session for the first day.',
+      day1Loading: 'Loading available Day 1 slots…',
+      day1Empty: 'No Day 1 slots are currently available. Please check back later.',
+      day2Heading: 'Choose a Compatible Day 2 Slot',
+      day2Hint: 'Only slots compatible with your Day 1 choice are shown.',
+      day2Loading: 'Loading compatible Day 2 slots…',
+      day2Empty: 'No compatible Day 2 slots remain for this Day 1 slot. Please select a different Day 1 slot above.',
+      detailsHeading: 'Your Details',
+      labelTitle: 'Title',
+      titlePlaceholder: 'Select a title…',
+      errTitle: 'Please select a title.',
+      labelGender: 'Gender',
+      genderPlaceholder: 'Select…',
+      errGender: 'Please select a gender.',
+      labelFirstName: 'First Name',
+      errFirstName: 'Please enter your first name.',
+      labelLastName: 'Last Name',
+      errLastName: 'Please enter your last name.',
+      labelComments: 'Comments (optional)',
+      commentsHint: 'Anything you would like us to know before your appointment?',
+      credentialsHeading: 'Keep these details safe',
+      confNumberLabel: 'Confirmation Number',
+      passcodeLabel: 'Booking Passcode',
+      credentialsNote: 'You need BOTH of these to reschedule or cancel your appointment. They have also been emailed to you.',
+      manageLinkLabel: 'Manage your booking',
+      helpHeading: 'Confused? Write us a message',
+      helpLabelName: 'Your Name (optional)',
+      helpLabelEmail: 'Your Email',
+      helpLabelMessage: 'Your Message',
+      helpSubmitBtnText: 'Send',
+      helpSending: 'Sending…',
+      helpSentNote: 'Thanks — your message has been sent. We will get back to you soon.',
+      helpErrEmail: 'Please enter a valid email address.',
+      helpErrMessage: 'Please enter your message.',
+      labelEmail: 'Email Address',
+      submitBtnText: 'Confirm Booking',
+      submitting: 'Booking…',
+      summaryDay1: 'Day 1:',
+      summaryDay2: 'Day 2:',
+      errNoSelection: 'Please select both a Day 1 and Day 2 slot before submitting.',
+      errEmail: 'Please enter a valid email address.',
+      errLoadDay1: 'Could not load Day 1 slots: ',
+      errLoadDay2: 'Could not load Day 2 slots: ',
+      errUnexpected: 'Unexpected error: ',
+      confirmedHeading: 'Booking Confirmed',
+      confirmedNote: 'A confirmation email has been sent to your email address.',
+      confName: 'Name', confEmail: 'Email',
+      confDay1: 'Day 1 Session', confDay2: 'Day 2 Session',
+      confLocationHeading: 'Location',
+      mapLink: 'View on Google Maps'
+    },
+    de: {
+      headerTitle: 'Terminplanung für das Experiment',
+      headerSubtitle: 'Buchen Sie unten Ihre zweitägige Experimentsitzung.',
+      stepLabel1: 'Tag 1', stepLabel2: 'Tag 2', stepLabel3: 'Angaben',
+      day1Heading: 'Wählen Sie einen Termin für Tag 1',
+      day1Hint: 'Wählen Sie einen verfügbaren Termin für den ersten Tag.',
+      day1Loading: 'Verfügbare Termine für Tag 1 werden geladen…',
+      day1Empty: 'Derzeit sind keine Termine für Tag 1 verfügbar. Bitte schauen Sie später erneut vorbei.',
+      day2Heading: 'Wählen Sie einen passenden Termin für Tag 2',
+      day2Hint: 'Es werden nur Termine angezeigt, die zu Ihrer Wahl für Tag 1 passen.',
+      day2Loading: 'Passende Termine für Tag 2 werden geladen…',
+      day2Empty: 'Für diesen Termin an Tag 1 sind keine passenden Termine für Tag 2 mehr verfügbar. Bitte wählen Sie oben einen anderen Termin für Tag 1.',
+      detailsHeading: 'Ihre Angaben',
+      labelTitle: 'Anrede',
+      titlePlaceholder: 'Anrede auswählen…',
+      errTitle: 'Bitte wählen Sie eine Anrede aus.',
+      labelGender: 'Geschlecht',
+      genderPlaceholder: 'Auswählen…',
+      errGender: 'Bitte wählen Sie ein Geschlecht aus.',
+      labelFirstName: 'Vorname',
+      errFirstName: 'Bitte geben Sie Ihren Vornamen ein.',
+      labelLastName: 'Nachname',
+      errLastName: 'Bitte geben Sie Ihren Nachnamen ein.',
+      labelComments: 'Anmerkungen (optional)',
+      commentsHint: 'Möchten Sie uns vor Ihrem Termin noch etwas mitteilen?',
+      credentialsHeading: 'Bitte gut aufbewahren',
+      confNumberLabel: 'Bestätigungsnummer',
+      passcodeLabel: 'Zugangscode',
+      credentialsNote: 'Sie benötigen BEIDE Angaben, um Ihren Termin zu verschieben oder zu stornieren. Sie wurden Ihnen auch per E-Mail zugesendet.',
+      manageLinkLabel: 'Termin verwalten',
+      helpHeading: 'Fragen? Schreiben Sie uns',
+      helpLabelName: 'Ihr Name (optional)',
+      helpLabelEmail: 'Ihre E-Mail-Adresse',
+      helpLabelMessage: 'Ihre Nachricht',
+      helpSubmitBtnText: 'Senden',
+      helpSending: 'Wird gesendet…',
+      helpSentNote: 'Danke — Ihre Nachricht wurde gesendet. Wir melden uns bald bei Ihnen.',
+      helpErrEmail: 'Bitte geben Sie eine gültige E-Mail-Adresse ein.',
+      helpErrMessage: 'Bitte geben Sie Ihre Nachricht ein.',
+      labelEmail: 'E-Mail-Adresse',
+      submitBtnText: 'Buchung bestätigen',
+      submitting: 'Wird gebucht…',
+      summaryDay1: 'Tag 1:',
+      summaryDay2: 'Tag 2:',
+      errNoSelection: 'Bitte wählen Sie sowohl einen Termin für Tag 1 als auch für Tag 2, bevor Sie fortfahren.',
+      errEmail: 'Bitte geben Sie eine gültige E-Mail-Adresse ein.',
+      errLoadDay1: 'Termine für Tag 1 konnten nicht geladen werden: ',
+      errLoadDay2: 'Termine für Tag 2 konnten nicht geladen werden: ',
+      errUnexpected: 'Unerwarteter Fehler: ',
+      confirmedHeading: 'Buchung bestätigt',
+      confirmedNote: 'Eine Bestätigungs-E-Mail wurde an Ihre E-Mail-Adresse gesendet.',
+      confName: 'Name', confEmail: 'E-Mail',
+      confDay1: 'Sitzung Tag 1', confDay2: 'Sitzung Tag 2',
+      confLocationHeading: 'Ort',
+      mapLink: 'Auf Google Maps ansehen'
+    }
+  };
+
+  // ---------------------------------------------------------------------
+  // Application state
+  // ---------------------------------------------------------------------
+  var state = {
+    language: 'en', // 'en' or 'de', set once the participant picks one
+    day1: null,      // {slotID, date, startTime, endTime}
+    day2: null       // {slotID, date, startTime, endTime}
+  };
+
+  // ---------------------------------------------------------------------
+  // Element references (cached once DOM is ready)
+  // ---------------------------------------------------------------------
+  var els = {};
+
+  document.addEventListener('DOMContentLoaded', function () {
+    cacheElements_();
+    els.btnEnglish.addEventListener('click', function () { chooseLanguage_('en'); });
+    els.btnGerman.addEventListener('click', function () { chooseLanguage_('de'); });
+    els.bookingForm.addEventListener('submit', onSubmitBooking_);
+    els.helpToggleLink.addEventListener('click', function (e) { e.preventDefault(); toggleHelpForm_(); });
+    els.helpForm.addEventListener('submit', onSubmitHelp_);
+    loadGenderOptions_();
+    loadProjectIdBanner_();
+    // Booking flow stays hidden until a language is picked — see chooseLanguage_().
+  });
+
+  function loadProjectIdBanner_() {
+    google.script.run
+      .withSuccessHandler(function (projectId) {
+        if (!els.projectIdBanner) return;
+        if (projectId) {
+          els.projectIdBanner.textContent = 'Project: ' + projectId;
+          els.projectIdBanner.classList.remove('hidden');
+        } else {
+          els.projectIdBanner.classList.add('hidden');
+        }
+      })
+      .withFailureHandler(function () { /* non-critical, ignore */ })
+      .getProjectId();
+  }
+
+  function loadGenderOptions_() {
+    google.script.run
+      .withSuccessHandler(function (options) {
+        (options || []).forEach(function (g) {
+          var opt = document.createElement('option');
+          opt.value = g; opt.textContent = g;
+          els.genderInput.appendChild(opt);
+        });
+      })
+      .withFailureHandler(function () { /* leave just the placeholder if this fails */ })
+      .getGenderOptions();
+  }
+
+  function cacheElements_() {
+    els.headerTitle = document.getElementById('headerTitle');
+    els.headerSubtitle = document.getElementById('headerSubtitle');
+    els.projectIdBanner = document.getElementById('projectIdBanner');
+
+    els.languageSection = document.getElementById('languageSection');
+    els.btnEnglish = document.getElementById('btnEnglish');
+    els.btnGerman = document.getElementById('btnGerman');
+
+    els.stepIndicator = document.getElementById('stepIndicator');
+    els.stepLabel1 = document.getElementById('stepLabel1');
+    els.stepLabel2 = document.getElementById('stepLabel2');
+    els.stepLabel3 = document.getElementById('stepLabel3');
+
+    els.messageBanner = document.getElementById('messageBanner');
+    els.bookingFlow = document.getElementById('bookingFlow');
+
+    els.day1Heading = document.getElementById('day1Heading');
+    els.day1Hint = document.getElementById('day1Hint');
+    els.day1Loading = document.getElementById('day1Loading');
+    els.day1Empty = document.getElementById('day1Empty');
+    els.day1Container = document.getElementById('day1Container');
+
+    els.day2Section = document.getElementById('day2Section');
+    els.day2Heading = document.getElementById('day2Heading');
+    els.day2Hint = document.getElementById('day2Hint');
+    els.day2Loading = document.getElementById('day2Loading');
+    els.day2Empty = document.getElementById('day2Empty');
+    els.day2Container = document.getElementById('day2Container');
+
+    els.detailsSection = document.getElementById('detailsSection');
+    els.detailsHeading = document.getElementById('detailsHeading');
+    els.labelTitle = document.getElementById('labelTitle');
+    els.titlePlaceholderOption = document.getElementById('titlePlaceholderOption');
+    els.labelGender = document.getElementById('labelGender');
+    els.genderPlaceholderOption = document.getElementById('genderPlaceholderOption');
+    els.labelFirstName = document.getElementById('labelFirstName');
+    els.labelLastName = document.getElementById('labelLastName');
+    els.labelEmail = document.getElementById('labelEmail');
+    els.selectionSummary = document.getElementById('selectionSummary');
+    els.bookingForm = document.getElementById('bookingForm');
+    els.titleInput = document.getElementById('participantTitle');
+    els.genderInput = document.getElementById('participantGender');
+    els.firstNameInput = document.getElementById('participantFirstName');
+    els.lastNameInput = document.getElementById('participantLastName');
+    els.emailInput = document.getElementById('participantEmail');
+    els.submitBtn = document.getElementById('submitBtn');
+    els.submitBtnText = document.getElementById('submitBtnText');
+    els.submitSpinner = document.getElementById('submitSpinner');
+
+    els.confirmationPanel = document.getElementById('confirmationPanel');
+    els.confirmedHeading = document.getElementById('confirmedHeading');
+    els.confirmedNote = document.getElementById('confirmedNote');
+    els.confirmationDetails = document.getElementById('confirmationDetails');
+    els.confLocationHeading = document.getElementById('confLocationHeading');
+    els.confAddressText = document.getElementById('confAddressText');
+    els.confMapsLink = document.getElementById('confMapsLink');
+
+    els.stepEls = document.querySelectorAll('#stepIndicator .step');
+
+    els.helpSection = document.getElementById('helpSection');
+    els.helpToggleLink = document.getElementById('helpToggleLink');
+    els.helpFormBox = document.getElementById('helpFormBox');
+    els.helpForm = document.getElementById('helpForm');
+    els.helpLabelName = document.getElementById('helpLabelName');
+    els.helpLabelEmail = document.getElementById('helpLabelEmail');
+    els.helpLabelMessage = document.getElementById('helpLabelMessage');
+    els.helpNameInput = document.getElementById('helpName');
+    els.helpEmailInput = document.getElementById('helpEmail');
+    els.helpMessageInput = document.getElementById('helpMessage');
+    els.helpSubmitBtn = document.getElementById('helpSubmitBtn');
+    els.helpSubmitBtnText = document.getElementById('helpSubmitBtnText');
+    els.helpSubmitSpinner = document.getElementById('helpSubmitSpinner');
+    els.helpSentNote = document.getElementById('helpSentNote');
+  }
+
+  // ---------------------------------------------------------------------
+  // STEP 0 — Language selection
+  // ---------------------------------------------------------------------
+
+  function chooseLanguage_(lang) {
+    state.language = lang;
+    applyTranslations_(lang);
+
+    hide_(els.languageSection);
+    show_(els.stepIndicator);
+    show_(els.bookingFlow);
+    show_(els.helpSection);
+    setActiveStep_(1);
+
+    loadDay1Slots_();
+  }
+
+  function applyTranslations_(lang) {
+    var t = I18N[lang];
+    document.documentElement.setAttribute('lang', lang);
+
+    els.headerTitle.textContent = t.headerTitle;
+    els.headerSubtitle.textContent = t.headerSubtitle;
+
+    els.stepLabel1.textContent = t.stepLabel1;
+    els.stepLabel2.textContent = t.stepLabel2;
+    els.stepLabel3.textContent = t.stepLabel3;
+
+    els.day1Heading.textContent = t.day1Heading;
+    els.day1Hint.textContent = t.day1Hint;
+    els.day1Loading.textContent = t.day1Loading;
+    els.day1Empty.textContent = t.day1Empty;
+
+    els.day2Heading.textContent = t.day2Heading;
+    els.day2Hint.textContent = t.day2Hint;
+    els.day2Loading.textContent = t.day2Loading;
+    els.day2Empty.textContent = t.day2Empty;
+
+    els.detailsHeading.textContent = t.detailsHeading;
+    els.labelTitle.textContent = t.labelTitle;
+    els.titlePlaceholderOption.textContent = t.titlePlaceholder;
+    els.labelGender.textContent = t.labelGender;
+    els.genderPlaceholderOption.textContent = t.genderPlaceholder;
+    els.labelFirstName.textContent = t.labelFirstName;
+    els.labelLastName.textContent = t.labelLastName;
+    els.labelEmail.textContent = t.labelEmail;
+    els.submitBtnText.textContent = t.submitBtnText;
+
+    els.confirmedHeading.textContent = t.confirmedHeading;
+    els.confirmedNote.textContent = t.confirmedNote;
+    var lc = document.getElementById('labelComments');
+    var ch = document.getElementById('commentsHint');
+    if (lc) lc.textContent = t.labelComments;
+    if (ch) ch.textContent = t.commentsHint;
+    els.confLocationHeading.textContent = t.confLocationHeading;
+
+    els.helpToggleLink.textContent = t.helpHeading;
+    els.helpLabelName.textContent = t.helpLabelName;
+    els.helpLabelEmail.textContent = t.helpLabelEmail;
+    els.helpLabelMessage.textContent = t.helpLabelMessage;
+    els.helpSubmitBtnText.textContent = t.helpSubmitBtnText;
+  }
+
+  // ---------------------------------------------------------------------
+  // STEP 1 — Day 1 slots
+  // ---------------------------------------------------------------------
+
+  function loadDay1Slots_() {
+    show_(els.day1Loading);
+    hide_(els.day1Empty);
+    els.day1Container.innerHTML = '';
+
+    google.script.run
+      .withSuccessHandler(renderDay1Slots_)
+      .withFailureHandler(function (err) {
+        hide_(els.day1Loading);
+        showError_(I18N[state.language].errLoadDay1 + errorText_(err));
+      })
+      .getDay1Slots(state.language, state.language);
+  }
+
+  function renderDay1Slots_(slots) {
+    hide_(els.day1Loading);
+    els.day1Container.innerHTML = '';
+
+    if (!slots || slots.length === 0) {
+      show_(els.day1Empty);
+      return;
+    }
+    hide_(els.day1Empty);
+
+    slots.forEach(function (slot) {
+      var card = buildSlotCard_(slot, function () { selectDay1_(slot, card); });
+      els.day1Container.appendChild(card);
+    });
+  }
+
+  function selectDay1_(slot, cardEl) {
+    state.day1 = slot;
+    state.day2 = null; // reset any previously chosen Day 2 slot
+
+    markSelectedCard_(els.day1Container, cardEl);
+
+    show_(els.day2Section);
+    hide_(els.detailsSection);
+    clearMessage_();
+    setActiveStep_(2);
+
+    loadDay2Slots_(slot.slotID);
+  }
+
+  // ---------------------------------------------------------------------
+  // STEP 2 — Compatible Day 2 slots (compatibility computed server-side
+  // from each slot's start time — no manual mapping involved)
+  // ---------------------------------------------------------------------
+
+  function loadDay2Slots_(day1SlotId) {
+    show_(els.day2Loading);
+    hide_(els.day2Empty);
+    els.day2Container.innerHTML = '';
+
+    google.script.run
+      .withSuccessHandler(function (slots) { renderDay2Slots_(slots); })
+      .withFailureHandler(function (err) {
+        hide_(els.day2Loading);
+        showError_(I18N[state.language].errLoadDay2 + errorText_(err));
+      })
+      .getCompatibleDay2Slots(day1SlotId, state.language, state.language);
+  }
+
+  function renderDay2Slots_(slots) {
+    hide_(els.day2Loading);
+    els.day2Container.innerHTML = '';
+
+    if (!slots || slots.length === 0) {
+      show_(els.day2Empty);
+      hide_(els.detailsSection);
+      return;
+    }
+    hide_(els.day2Empty);
+
+    slots.forEach(function (slot) {
+      var card = buildSlotCard_(slot, function () { selectDay2_(slot, card); });
+      els.day2Container.appendChild(card);
+    });
+  }
+
+  function selectDay2_(slot, cardEl) {
+    state.day2 = slot;
+    markSelectedCard_(els.day2Container, cardEl);
+
+    renderSelectionSummary_();
+    show_(els.detailsSection);
+    setActiveStep_(3);
+    clearMessage_();
+
+    els.detailsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ---------------------------------------------------------------------
+  // STEP 3 — Participant details & submission
+  // ---------------------------------------------------------------------
+
+  function renderSelectionSummary_() {
+    var t = I18N[state.language];
+    els.selectionSummary.innerHTML = '';
+    if (!state.day1 || !state.day2) return;
+
+    var wrap = document.createElement('div');
+
+    var d1 = document.createElement('div');
+    d1.className = 'summary-line';
+    d1.appendChild(labelSpan_(t.summaryDay1 + ' '));
+    d1.appendChild(document.createTextNode(
+      state.day1.date + ' · ' + state.day1.startTime + ' – ' + state.day1.endTime
+    ));
+
+    var d2 = document.createElement('div');
+    d2.className = 'summary-line';
+    d2.appendChild(labelSpan_(t.summaryDay2 + ' '));
+    d2.appendChild(document.createTextNode(
+      state.day2.date + ' · ' + state.day2.startTime + ' – ' + state.day2.endTime
+    ));
+
+    wrap.appendChild(d1);
+    wrap.appendChild(d2);
+    els.selectionSummary.appendChild(wrap);
+  }
+
+  function labelSpan_(text) {
+    var s = document.createElement('strong');
+    s.textContent = text;
+    return s;
+  }
+
+  function onSubmitBooking_(evt) {
+    evt.preventDefault();
+    clearMessage_();
+    var t = I18N[state.language];
+
+    if (!state.day1 || !state.day2) {
+      showError_(t.errNoSelection);
+      return;
+    }
+
+    var title = els.titleInput.value.trim();
+    var gender = els.genderInput.value.trim();
+    var firstName = els.firstNameInput.value.trim();
+    var lastName = els.lastNameInput.value.trim();
+    var email = els.emailInput.value.trim();
+
+    if (!title) {
+      showError_(t.errTitle);
+      els.titleInput.focus();
+      return;
+    }
+    if (!gender) {
+      showError_(t.errGender);
+      els.genderInput.focus();
+      return;
+    }
+    if (!firstName) {
+      showError_(t.errFirstName);
+      els.firstNameInput.focus();
+      return;
+    }
+    if (!lastName) {
+      showError_(t.errLastName);
+      els.lastNameInput.focus();
+      return;
+    }
+    var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(email)) {
+      showError_(t.errEmail);
+      els.emailInput.focus();
+      return;
+    }
+
+    var payload = {
+      day1SlotID: state.day1.slotID,
+      day2SlotID: state.day2.slotID,
+      comments: (document.getElementById('participantComments') || {}).value || '',
+      title: title,
+      gender: gender,
+      firstName: firstName,
+      lastName: lastName,
+      email: email,
+      lang: state.language
+    };
+
+    setSubmitting_(true);
+
+    google.script.run
+      .withSuccessHandler(function (result) {
+        setSubmitting_(false);
+        if (result && result.success) {
+          showConfirmation_(result);
+        } else {
+          showError_((result && result.message) || 'Booking could not be completed.');
+          refreshAfterFailure_();
+        }
+      })
+      .withFailureHandler(function (err) {
+        setSubmitting_(false);
+        showError_(t.errUnexpected + errorText_(err));
+      })
+      .submitBooking(payload);
+  }
+
+  function refreshAfterFailure_() {
+    loadDay1Slots_();
+    if (state.day1) {
+      loadDay2Slots_(state.day1.slotID);
+    }
+  }
+
+  function setSubmitting_(isSubmitting) {
+    var t = I18N[state.language];
+    els.submitBtn.disabled = isSubmitting;
+    if (isSubmitting) {
+      show_(els.submitSpinner);
+      els.submitBtnText.textContent = t.submitting;
+    } else {
+      hide_(els.submitSpinner);
+      els.submitBtnText.textContent = t.submitBtnText;
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Confirmation screen
+  // ---------------------------------------------------------------------
+
+  function showConfirmation_(result) {
+    var t = I18N[state.language];
+    hide_(els.bookingFlow);
+    els.confirmationDetails.innerHTML = '';
+
+    // Note: no participant ID is shown — the research team assigns and
+    // tracks their own participant numbers separately.
+    var rows = [
+      [t.confName, result.name],
+      [t.confEmail, result.email],
+      [t.confDay1, result.day1.date + ' · ' + result.day1.startTime + ' – ' + result.day1.endTime],
+      [t.confDay2, result.day2.date + ' · ' + result.day2.startTime + ' – ' + result.day2.endTime]
+    ];
+
+    rows.forEach(function (pair) {
+      var row = document.createElement('div');
+      row.className = 'confirmation-row';
+
+      var label = document.createElement('span');
+      label.className = 'confirmation-label';
+      label.textContent = pair[0];
+
+      var value = document.createElement('span');
+      value.className = 'confirmation-value';
+      value.textContent = pair[1];
+
+      row.appendChild(label);
+      row.appendChild(value);
+      els.confirmationDetails.appendChild(row);
+    });
+
+    // Booking credentials — the participant needs these to reschedule/cancel.
+    if (result.confirmationNumber) {
+      var box = document.getElementById('credentialsBox');
+      document.getElementById('credentialsHeading').textContent = t.credentialsHeading;
+      document.getElementById('confNumberLabel').textContent = t.confNumberLabel;
+      document.getElementById('passcodeLabel').textContent = t.passcodeLabel;
+      document.getElementById('confNumberValue').textContent = result.confirmationNumber;
+      document.getElementById('passcodeValue').textContent = result.passcode;
+      document.getElementById('credentialsNote').textContent = t.credentialsNote;
+      var link = document.getElementById('manageLink');
+      if (result.manageUrl) {
+        link.href = result.manageUrl;
+        link.textContent = t.manageLinkLabel;
+        link.parentNode.classList.remove('hidden');
+      } else {
+        link.parentNode.classList.add('hidden');
+      }
+      box.classList.remove('hidden');
+    }
+
+    els.confAddressText.textContent = LOCATION.address;
+    els.confMapsLink.href = LOCATION.mapsUrl;
+    els.confMapsLink.textContent = t.mapLink;
+
+    show_(els.confirmationPanel);
+    els.stepIndicator.classList.add('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ---------------------------------------------------------------------
+  // Reusable slot card builder
+  // ---------------------------------------------------------------------
+
+  function buildSlotCard_(slot, onClick) {
+    var card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'slot-card';
+
+    var dateEl = document.createElement('div');
+    dateEl.className = 'slot-date';
+    dateEl.textContent = slot.date;
+
+    var timeEl = document.createElement('div');
+    timeEl.className = 'slot-time';
+    timeEl.textContent = slot.startTime + ' – ' + slot.endTime;
+
+    // Slot IDs are internal identifiers and are deliberately NOT shown to
+    // participants; the ID is kept on the element's dataset for selection.
+    card.dataset.slotId = slot.slotID;
+
+    card.appendChild(dateEl);
+    card.appendChild(timeEl);
+    card.addEventListener('click', onClick);
+
+    return card;
+  }
+
+  function markSelectedCard_(containerEl, selectedCard) {
+    var cards = containerEl.querySelectorAll('.slot-card');
+    cards.forEach(function (c) { c.classList.remove('selected'); });
+    selectedCard.classList.add('selected');
+  }
+
+  // ---------------------------------------------------------------------
+  // Step indicator
+  // ---------------------------------------------------------------------
+
+  function setActiveStep_(stepNumber) {
+    els.stepEls.forEach(function (stepEl) {
+      var n = parseInt(stepEl.getAttribute('data-step'), 10);
+      stepEl.classList.toggle('active', n === stepNumber);
+      stepEl.classList.toggle('done', n < stepNumber);
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Help / contact form ("Confused? Write us a message")
+  // ---------------------------------------------------------------------
+
+  function toggleHelpForm_() {
+    if (els.helpFormBox.classList.contains('hidden')) {
+      show_(els.helpFormBox);
+    } else {
+      hide_(els.helpFormBox);
+    }
+  }
+
+  function onSubmitHelp_(evt) {
+    evt.preventDefault();
+    var t = I18N[state.language];
+    clearMessage_();
+
+    var name = els.helpNameInput.value.trim();
+    var email = els.helpEmailInput.value.trim();
+    var message = els.helpMessageInput.value.trim();
+
+    var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(email)) {
+      showError_(t.helpErrEmail);
+      return;
+    }
+    if (!message) {
+      showError_(t.helpErrMessage);
+      return;
+    }
+
+    els.helpSubmitBtn.disabled = true;
+    show_(els.helpSubmitSpinner);
+    els.helpSubmitBtnText.textContent = t.helpSending;
+
+    google.script.run
+      .withSuccessHandler(function (result) {
+        els.helpSubmitBtn.disabled = false;
+        hide_(els.helpSubmitSpinner);
+        els.helpSubmitBtnText.textContent = t.helpSubmitBtnText;
+        if (result && result.success) {
+          els.helpForm.reset();
+          hide_(els.helpForm);
+          els.helpSentNote.textContent = t.helpSentNote;
+          show_(els.helpSentNote);
+        } else {
+          showError_((result && result.message) || t.errUnexpected);
+        }
+      })
+      .withFailureHandler(function (err) {
+        els.helpSubmitBtn.disabled = false;
+        hide_(els.helpSubmitSpinner);
+        els.helpSubmitBtnText.textContent = t.helpSubmitBtnText;
+        showError_(t.errUnexpected + errorText_(err));
+      })
+      .sendHelpMessage(name, email, message, state.language);
+  }
+
+  // ---------------------------------------------------------------------
+  // Banner / message helpers
+  // ---------------------------------------------------------------------
+
+  function showError_(text) {
+    els.messageBanner.textContent = text;
+    els.messageBanner.className = 'banner banner-error';
+    els.messageBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function clearMessage_() {
+    els.messageBanner.textContent = '';
+    els.messageBanner.className = 'banner hidden';
+  }
+
+  function errorText_(err) {
+    if (!err) return 'Unknown error';
+    return err.message || String(err);
+  }
+
+  // ---------------------------------------------------------------------
+  // Show / hide helpers
+  // ---------------------------------------------------------------------
+
+  function show_(el) { el.classList.remove('hidden'); }
+  function hide_(el) { el.classList.add('hidden'); }
+</script>

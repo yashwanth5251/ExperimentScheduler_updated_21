@@ -1,0 +1,809 @@
+<style>
+  /* ==========================================================================
+     AdminStyles.html — Visual design for the Admin portal
+     ========================================================================== */
+
+  :root {
+    --color-primary: #4f46e5;
+    --color-primary-dark: #4338ca;
+    --color-bg: #f5f6fa;
+    --color-card: #ffffff;
+    --color-border: #e2e4ea;
+    --color-text: #1f2330;
+    --color-text-muted: #6b7280;
+    --color-success-bg: #ecfdf5;
+    --color-success-text: #047857;
+    --color-error-bg: #fef2f2;
+    --color-error-text: #b91c1c;
+    --color-warn-bg: #fffbeb;
+    --color-warn-text: #92400e;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+
+  .admin-container {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 32px 20px 64px;
+  }
+
+  .admin-header {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  .admin-header h1 {
+    font-size: 24px;
+    margin: 0 0 4px;
+  }
+
+  .subtitle {
+    color: var(--color-text-muted);
+    margin: 0;
+    font-size: 14px;
+  }
+
+  /* Round 10: Project ID — sits above everything (all portals), and the
+     Main-Admin-only inline edit control under the Admin Portal header. */
+  .project-id-banner {
+    background: var(--color-navy, #1F3A5F);
+    color: #fff;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 6px 12px;
+  }
+  .project-id-control {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 13px;
+  }
+  .project-id-control label {
+    color: var(--color-text-muted);
+    font-weight: 600;
+  }
+  .project-id-control input {
+    width: 240px;
+    padding: 4px 8px;
+  }
+
+  .owner-banner {
+    background: #f8f9fc;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 12.5px;
+    color: var(--color-text-muted);
+    margin-bottom: 16px;
+    text-align: center;
+  }
+
+  .hidden { display: none !important; }
+
+  /* ---------------- Banner ---------------- */
+
+  .banner {
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    margin-bottom: 18px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .banner-error {
+    background: var(--color-error-bg);
+    color: var(--color-error-text);
+    border: 1px solid #fecaca;
+  }
+
+  .banner-success {
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
+    border: 1px solid #a7f3d0;
+  }
+
+  /* ---------------- Concise notifications ---------------- */
+  .concise-title {
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .concise-lines {
+    list-style: none;
+    margin: 0 0 6px;
+    padding: 0;
+    font-weight: 400;
+  }
+  .concise-lines li { margin: 1px 0; }
+  .concise-details-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+    color: inherit;
+  }
+  .details-modal-body {
+    white-space: pre-line;
+    max-height: 60vh;
+    overflow-y: auto;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+
+  /* ---------------- Panels ---------------- */
+
+  .panel {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 22px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+
+  .panel h2, .panel h3 {
+    margin: 0 0 6px;
+  }
+
+  .panel h3 { font-size: 16px; }
+
+  .panel-subtitle {
+    font-weight: 400;
+    color: var(--color-text-muted);
+    font-size: 13px;
+  }
+
+  .hint {
+    color: var(--color-text-muted);
+    font-size: 13px;
+    margin: 0 0 16px;
+  }
+
+  .dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .dashboard-header h2 {
+    margin: 0;
+    font-size: 19px;
+  }
+
+  .dashboard-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .loading, .empty-message {
+    color: var(--color-text-muted);
+    font-size: 13.5px;
+    padding: 10px 0;
+  }
+
+  .empty-message {
+    background: var(--color-warn-bg);
+    border: 1px solid #fde68a;
+    color: var(--color-warn-text);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+  }
+
+  /* ---------------- Slot table ---------------- */
+
+  /* Long tables scroll horizontally within their own container instead of
+     overflowing the panel/modal (spec round 2, #14). */
+  .table-scroll {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .slot-table {
+    width: 100%;
+    min-width: 520px;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+
+  .slot-table th, .slot-table td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .slot-table th {
+    color: var(--color-text-muted);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .status-pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* ---------------- TA Blood Drawing availability grid ("poll" layout) ---------------- */
+
+  .ta-grid-nav {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .ta-grid-scroll {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+  }
+
+  .ta-grid-table {
+    border-collapse: collapse;
+    font-size: 13px;
+    min-width: 100%;
+  }
+
+  .ta-grid-table th, .ta-grid-table td {
+    border: 1px solid var(--color-border);
+    padding: 6px 10px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .ta-grid-table thead th {
+    background: #ececec;
+    font-weight: 700;
+    font-size: 12.5px;
+  }
+
+  .ta-grid-table .ta-grid-corner,
+  .ta-grid-table .ta-grid-name-cell,
+  .ta-grid-table .ta-grid-row-label {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    text-align: left;
+    background: #fff;
+    min-width: 160px;
+  }
+
+  .ta-grid-table thead .ta-grid-corner {
+    background: #ececec;
+    z-index: 3;
+  }
+
+  .ta-grid-table .ta-grid-name-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+  }
+
+  .ta-grid-table .ta-grid-checkbox-cell input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+  }
+
+  .ta-grid-table .ta-grid-submit-cell {
+    background: #f7f7f7;
+  }
+
+  .ta-grid-spacer-row td {
+    border: none;
+    padding: 4px 0;
+    background: transparent;
+  }
+
+  .ta-grid-table .ta-grid-available {
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
+    font-weight: 700;
+  }
+
+  .ta-grid-table .ta-grid-unavailable {
+    background: var(--color-error-bg);
+    color: var(--color-error-text);
+    font-weight: 700;
+  }
+
+  .ta-grid-table .ta-grid-me-row .ta-grid-name-cell {
+    font-weight: 700;
+  }
+
+  .ta-grid-table tfoot td {
+    background: var(--color-success-bg);
+    font-weight: 700;
+  }
+
+  .status-available {
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
+  }
+
+  .status-booked {
+    background: #f3f4f6;
+    color: var(--color-text-muted);
+  }
+
+  /* ---------------- Forms ---------------- */
+
+  .subform {
+    margin-bottom: 18px;
+    padding-bottom: 4px;
+  }
+
+  .subform h4 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--color-text-muted);
+    margin: 0 0 10px;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+  }
+
+  .filter-toolbar {
+    background: var(--color-surface-alt, #f7f7f9);
+    border: 1px solid var(--color-border, #e0e0e5);
+    border-radius: 8px;
+    padding: 10px 14px 0;
+    margin-bottom: 14px;
+  }
+  .filter-toolbar .form-group { margin-bottom: 10px; }
+  .filter-toolbar label { font-size: 12px; }
+
+  .form-group {
+    margin-bottom: 14px;
+    min-width: 0; /* lets long select/input values shrink instead of forcing overflow */
+  }
+
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  label {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: var(--color-text);
+  }
+
+  input[type="text"],
+  input[type="date"],
+  input[type="time"],
+  input[type="number"],
+  input[type="password"],
+  select {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1.5px solid var(--color-border);
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-family: inherit;
+    background: #fff;
+    color: var(--color-text);
+  }
+
+  input:focus, select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s ease, opacity 0.15s ease;
+  }
+
+  .btn-primary {
+    background: var(--color-primary);
+    color: #fff;
+    width: 100%;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-primary-dark);
+  }
+
+  .btn-secondary {
+    background: #f3f4f6;
+    color: var(--color-text);
+  }
+
+  .btn-secondary:hover {
+    background: #e5e7eb;
+  }
+
+  .btn-link {
+    background: none;
+    color: var(--color-primary);
+    padding: 6px 0;
+  }
+
+  .btn-link:hover {
+    text-decoration: underline;
+  }
+
+  .btn-danger {
+    background: #dc2626;
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    background: #b91c1c;
+  }
+
+  .btn-sm {
+    padding: 5px 10px;
+    font-size: 12px;
+    width: auto;
+  }
+
+  .row-actions-cell {
+    white-space: nowrap;
+  }
+
+  .slot-table select {
+    padding: 5px 7px;
+    font-size: 12.5px;
+    min-width: 140px;
+  }
+
+  .day2-checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    background: #fafafa;
+  }
+
+  .day2-checkbox-item input[type="checkbox"] {
+    width: auto;
+  }
+
+  .tag-warn {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .warning-box {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin: 10px 0;
+    font-size: 13px;
+    color: #92400e;
+  }
+
+  .warning-box ul {
+    margin: 6px 0;
+    padding-left: 20px;
+  }
+
+  .warning-box li { margin-bottom: 3px; }
+
+  .day2-staff-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    background: #fafafa;
+    flex-wrap: wrap;
+  }
+
+  .day2-staff-row select { min-width: 190px; width: auto; }
+  .day2-staff-row input[type="checkbox"] { width: auto; }
+  .day2-staff-row .slot-label { flex: 1 1 240px; }
+
+  .compatible-box {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin: 10px 0;
+    font-size: 13px;
+  }
+
+  .compatible-box ul {
+    margin: 6px 0 0;
+    padding-left: 20px;
+  }
+
+  .compatible-box li {
+    margin-bottom: 3px;
+  }
+
+  #deleteDay1OrphanList {
+    margin: 10px 0;
+    padding-left: 20px;
+    font-size: 13px;
+  }
+
+  #deleteDay1OrphanList li {
+    margin-bottom: 4px;
+  }
+
+  .btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .spinner {
+    width: 13px;
+    height: 13px;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    border-top-color: #fff;
+    border-radius: 50%;
+    display: inline-block;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* ---------------- Day 2 rows (in Add Day 1 form) ---------------- */
+
+  /* Round 3, #5: this row used to be a rigid `1fr 1fr 1fr auto auto` grid.
+     Inside the width-capped scheduling dialog the `1fr` tracks could not
+     shrink below their inputs' intrinsic width (grid items default to
+     min-width:auto), so the trailing `auto` columns pushed the Day 2 time
+     controls outside the visible panel. An auto-fit grid plus explicit
+     min-width:0 lets every control shrink and wrap instead of clipping. */
+  .day2-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    align-items: end;
+    margin-bottom: 12px;
+    padding: 12px;
+    background: #fafafa;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+  }
+
+  .day2-row > * { min-width: 0; }
+
+  .day2-row .form-group {
+    margin-bottom: 0;
+    min-width: 0;
+  }
+
+  .day2-row input,
+  .day2-row select {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .tag {
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    align-self: end;
+    margin-bottom: 1px;
+  }
+
+  .tag-ok {
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
+  }
+
+  .tag-bad {
+    background: var(--color-error-bg);
+    color: var(--color-error-text);
+  }
+
+  .tag-pending {
+    background: #f3f4f6;
+    color: var(--color-text-muted);
+  }
+
+  .row-remove-btn {
+    background: none;
+    border: none;
+    color: var(--color-error-text);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 6px;
+    align-self: end;
+  }
+
+  /* ---------------- Modal ---------------- */
+  /* Dynamic panels (spec round 2, #14): every modal sizes itself to its
+     content, shrinks to fit small viewports, and scrolls internally
+     rather than letting content overflow outside the visible panel. */
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 17, 26, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 50;
+    box-sizing: border-box;
+  }
+
+  .modal {
+    background: #fff;
+    border-radius: var(--radius);
+    padding: 24px;
+    max-width: 420px;
+    width: 100%;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    box-sizing: border-box;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  }
+
+  .modal-wide {
+    max-width: min(640px, 96vw);
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+  }
+
+  /* ---------------- Scheduling dialog (round 3, #5 & #6) ----------------
+     The scheduling dialog carries far more controls than a normal modal
+     (Day 1 derivation, staff, a variable-length list of compatible Day 2
+     slots, plus any number of new Day 2 rows). It therefore gets its own
+     wider cap, and grows vertically with its content up to the viewport,
+     after which it scrolls internally rather than clipping anything. */
+  .modal-schedule {
+    max-width: min(900px, 96vw);
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Long lists scroll inside themselves so they can never push the action
+     buttons or validation messages out of view. */
+  #schedDay2ExistingList {
+    max-height: 34vh;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  #schedNewDay2RowsContainer {
+    max-height: 40vh;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  /* Keeps Cancel/Save reachable no matter how much content is displayed. */
+  .modal-schedule .modal-actions {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    padding-top: 12px;
+    margin-top: 8px;
+    border-top: 1px solid var(--color-border);
+    z-index: 1;
+  }
+
+  .btn-small {
+    padding: 4px 10px;
+    font-size: 0.85em;
+    margin-right: 6px;
+  }
+
+  .modal h3 {
+    margin: 0 0 14px;
+    font-size: 17px;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 6px;
+  }
+
+  .modal-actions .btn {
+    flex: 1;
+  }
+
+  .inline-row { display: flex; gap: 8px; align-items: center; }
+  .inline-row input[type="date"] { flex: 1; }
+
+  .avail-list { list-style: none; padding: 0; margin: 10px 0; }
+  .avail-list li {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #f1f5f9; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px;
+    font-size: 14px;
+  }
+  .avail-list button {
+    background: none; border: none; color: #dc2626; cursor: pointer;
+    font-size: 18px; line-height: 1;
+  }
+
+  .booking-pick-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+  .booking-pick-option {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+    cursor: pointer; font-size: 14px;
+  }
+  .booking-pick-option:hover { background: #f8fafc; }
+  .booking-pick-option.current { border-color: #94a3b8; background: #f1f5f9; }
+  .booking-pick-option.selected { border-color: #2563eb; background: #eff6ff; font-weight: 600; }
+
+  /* ---------------- Responsive ---------------- */
+
+  @media (max-width: 620px) {
+    .form-row { grid-template-columns: 1fr; }
+    .day2-row { grid-template-columns: 1fr; }
+    .row-remove-btn { justify-self: end; }
+    .slot-table { font-size: 12.5px; }
+    .modal { padding: 16px; max-height: calc(100vh - 24px); }
+    .modal-schedule { padding: 16px; max-height: calc(100vh - 24px); }
+    .modal-overlay { padding: 10px; }
+    .dashboard-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .dashboard-actions { width: 100%; }
+    .dashboard-actions .btn { flex: 1 1 auto; }
+    .modal-actions { flex-wrap: wrap; }
+    .modal-actions .btn { flex: 1 1 auto; }
+    .banner { word-wrap: break-word; overflow-wrap: break-word; }
+    /* On small screens give the internal lists more of the (already
+       scrollable) modal so controls aren't squeezed into tiny scroll areas. */
+    #schedDay2ExistingList { max-height: 46vh; }
+    #schedNewDay2RowsContainer { max-height: 52vh; }
+  }
+</style>

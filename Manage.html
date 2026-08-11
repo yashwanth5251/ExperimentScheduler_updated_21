@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manage Appointment</title>
+  <?!= include('Styles'); ?>
+  <?!= include('ManageStyles'); ?>
+</head>
+<body>
+  <!-- Round 10: Project ID banner — see Admin.html for the matching
+       control the Main Admin uses to set this. Display only. -->
+  <div id="projectIdBanner" class="project-id-banner hidden"></div>
+
+  <div class="container">
+
+    <header class="header">
+      <h1 id="mHeaderTitle">Manage Your Appointment</h1>
+      <p class="subtitle" id="mHeaderSubtitle">Reschedule or cancel your booking</p>
+    </header>
+
+    <!-- ---- Language ---- -->
+    <section class="section" id="mLanguageSection">
+      <h2 id="mLanguageHeading">Please select your language / Bitte wählen Sie Ihre Sprache</h2>
+      <div class="lang-buttons">
+        <button type="button" class="btn btn-primary" id="mBtnEnglish">English</button>
+        <button type="button" class="btn btn-primary" id="mBtnGerman">Deutsch</button>
+      </div>
+    </section>
+
+    <div id="mMessageBanner" class="banner hidden" role="alert"></div>
+
+    <!-- ---- Step 1: verification ---- -->
+    <section class="section hidden" id="mVerifySection">
+      <h2 id="mVerifyHeading">Verify Your Booking</h2>
+      <p class="hint" id="mVerifyHint">
+        Enter the Confirmation Number and Passcode from your booking confirmation email.
+      </p>
+      <form id="mVerifyForm">
+        <div class="form-group">
+          <label for="mConfNumber" id="mLabelConf">Confirmation Number</label>
+          <input type="text" id="mConfNumber" autocomplete="off" required>
+        </div>
+        <div class="form-group">
+          <label for="mPasscode" id="mLabelPass">Booking Passcode</label>
+          <input type="text" id="mPasscode" autocomplete="off" required>
+        </div>
+        <button type="submit" class="btn btn-primary" id="mVerifyBtn">
+          <span id="mVerifyBtnText">Continue</span>
+          <span id="mVerifySpinner" class="spinner hidden"></span>
+        </button>
+      </form>
+    </section>
+
+    <!-- ---- Step 2: booking overview + choose action ---- -->
+    <section class="section hidden" id="mOverviewSection">
+      <h2 id="mOverviewHeading">Your Booking</h2>
+      <div id="mBookingDetails" class="details-box"></div>
+
+      <div class="subsection">
+        <h3 id="mDetailsHeading">Your Details</h3>
+        <p class="hint" id="mDetailsHint">You can correct your name or email address here.</p>
+        <div class="form-group">
+          <label for="mName" id="mLabelName">Full Name</label>
+          <input type="text" id="mName">
+        </div>
+        <div class="form-group">
+          <label for="mEmail" id="mLabelEmail">Email Address</label>
+          <input type="email" id="mEmail">
+        </div>
+        <button type="button" class="btn btn-secondary" id="mSaveDetailsBtn">
+          <span id="mSaveDetailsBtnText">Save Changes</span>
+        </button>
+      </div>
+
+      <div class="action-buttons">
+        <button type="button" class="btn btn-primary" id="mRescheduleBtn">Reschedule Appointment</button>
+        <button type="button" class="btn btn-secondary" id="mChangeDay2OnlyBtn">Change Day 2 Only</button>
+        <button type="button" class="btn btn-danger" id="mCancelBtn">Cancel Appointment</button>
+      </div>
+    </section>
+
+    <!-- ---- Step 3a: reschedule ---- -->
+    <section class="section hidden" id="mRescheduleSection">
+      <h2 id="mRescheduleHeading">Choose a New Appointment</h2>
+
+      <div id="mNewDay1Block">
+        <h3 id="mNewDay1Heading">Step 1 — Select a new Day 1 appointment</h3>
+        <div id="mDay1Loading" class="loading">Loading…</div>
+        <p class="empty-message hidden" id="mDay1Empty">No appointments are currently available.</p>
+        <div id="mDay1Container" class="slot-grid"></div>
+      </div>
+
+      <div id="mNewDay2Block" class="hidden">
+        <h3 id="mNewDay2Heading">Step 2 — Select a new Day 2 appointment</h3>
+        <button type="button" class="btn btn-secondary hidden" id="mKeepDay2Btn">
+          Keep my current Day 2 appointment
+        </button>
+        <div id="mDay2Loading" class="loading hidden">Loading…</div>
+        <p class="empty-message hidden" id="mDay2Empty">
+          No compatible Day 2 appointments remain. Please choose a different Day 1 appointment.
+        </p>
+        <div id="mDay2Container" class="slot-grid"></div>
+      </div>
+
+      <div id="mRescheduleConfirmBlock" class="hidden">
+        <h3 id="mConfirmChangeHeading">Confirm the change</h3>
+        <div id="mChangeSummary" class="details-box"></div>
+        <button type="button" class="btn btn-primary" id="mConfirmRescheduleBtn">
+          <span id="mConfirmRescheduleBtnText">Confirm Reschedule</span>
+          <span id="mRescheduleSpinner" class="spinner hidden"></span>
+        </button>
+        <button type="button" class="btn btn-secondary" id="mRescheduleBackBtn">Back</button>
+      </div>
+    </section>
+
+    <!-- ---- Step 3b: cancel ---- -->
+    <section class="section hidden" id="mCancelSection">
+      <h2 id="mCancelHeading">Cancel Your Appointment</h2>
+      <div id="mCancelDetails" class="details-box"></div>
+      <p class="hint" id="mCancelWarning">
+        This will release both of your appointment slots. This cannot be undone.
+      </p>
+      <button type="button" class="btn btn-danger" id="mConfirmCancelBtn">
+        <span id="mConfirmCancelBtnText">Yes, Cancel My Appointment</span>
+        <span id="mCancelSpinner" class="spinner hidden"></span>
+      </button>
+      <button type="button" class="btn btn-secondary" id="mCancelBackBtn">Go Back</button>
+    </section>
+
+    <!-- ---- Step 4: availability after cancelling ---- -->
+    <section class="section hidden" id="mAvailabilitySection">
+      <h2 id="mAvailHeading">Would you like to tell us when you may be available again?</h2>
+      <p class="hint" id="mAvailHint">
+        This is optional. It helps us contact you when a suitable appointment opens up.
+      </p>
+      <div class="form-group">
+        <label for="mAvailDate" id="mLabelAvailDate">Add a date you may be available</label>
+        <div class="inline-row">
+          <input type="date" id="mAvailDate">
+          <button type="button" class="btn btn-secondary" id="mAddDateBtn">Add</button>
+        </div>
+      </div>
+      <ul id="mAvailList" class="avail-list"></ul>
+      <button type="button" class="btn btn-primary" id="mSubmitAvailBtn">
+        <span id="mSubmitAvailBtnText">Submit These Dates</span>
+        <span id="mAvailSpinner" class="spinner hidden"></span>
+      </button>
+      <button type="button" class="btn btn-secondary" id="mDontKnowBtn">I don't know yet</button>
+    </section>
+
+    <!-- ---- Final confirmation ---- -->
+    <section class="section hidden" id="mDonePanel">
+      <h2 id="mDoneHeading">Done</h2>
+      <div id="mDoneDetails" class="details-box"></div>
+      <div class="contact-box">
+        <strong id="mContactHeading">Contact</strong>
+        <div id="mContactEmail"></div>
+        <div id="mContactPhone"></div>
+      </div>
+    </section>
+
+  </div>
+
+  <?!= include('ManageJavaScript'); ?>
+</body>
+</html>

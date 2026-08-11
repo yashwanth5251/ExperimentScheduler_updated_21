@@ -1,0 +1,585 @@
+<script>
+  /**
+   * ==========================================================================
+   *  ManageJavaScript.html — Participant self-service portal
+   * ==========================================================================
+   *  Authenticates every server call with Confirmation Number + Passcode.
+   *  The passcode is held in memory only for the duration of the session and
+   *  is never written to storage.
+   * ==========================================================================
+   */
+
+  var T = {
+    en: {
+      headerTitle: 'Manage Your Appointment',
+      headerSubtitle: 'Reschedule or cancel your booking',
+      verifyHeading: 'Verify Your Booking',
+      verifyHint: 'Enter the Confirmation Number and Passcode from your booking confirmation email.',
+      labelConf: 'Confirmation Number', labelPass: 'Booking Passcode',
+      continueBtn: 'Continue', verifying: 'Checking…',
+      overviewHeading: 'Your Booking',
+      detailsHeading: 'Your Details',
+      detailsHint: 'You can correct your name or email address here.',
+      labelName: 'Full Name', labelEmail: 'Email Address',
+      saveChanges: 'Save Changes', saving: 'Saving…',
+      rescheduleBtn: 'Reschedule Appointment', cancelBtn: 'Cancel Appointment',
+      changeDay2OnlyBtn: 'Change Day 2 Only',
+      keepDay2Btn: 'Keep my current Day 2 appointment',
+      rescheduleHeading: 'Choose a New Appointment',
+      newDay1Heading: 'Step 1 — Select a new Day 1 appointment',
+      newDay2Heading: 'Step 2 — Select a new Day 2 appointment',
+      day1Empty: 'No appointments are currently available.',
+      day2Empty: 'No compatible Day 2 appointments remain. Please choose a different Day 1 appointment.',
+      confirmChangeHeading: 'Confirm the change',
+      confirmReschedule: 'Confirm Reschedule',
+      back: 'Back', goBack: 'Go Back',
+      cancelHeading: 'Cancel Your Appointment',
+      cancelWarning: 'This will release both of your appointment slots. This cannot be undone.',
+      confirmCancel: 'Yes, Cancel My Appointment',
+      availHeading: 'Would you like to tell us when you may be available again?',
+      availHint: 'This is optional. It helps us contact you when a suitable appointment opens up.',
+      labelAvailDate: 'Add a date you may be available',
+      add: 'Add', submitDates: 'Submit These Dates', dontKnow: "I don't know yet",
+      doneHeading: 'Done', contactHeading: 'Contact',
+      loading: 'Loading…',
+      day1Label: 'Day 1', day2Label: 'Day 2',
+      nameLabel: 'Name', emailLabel: 'Email', staffLabel: 'Assigned staff',
+      commentsLabel: 'Your comments', confLabel: 'Confirmation Number',
+      oldAppt: 'Current appointment', newAppt: 'New appointment',
+      pickDateFirst: 'Please choose a date first.',
+      dateAlready: 'That date is already in the list.'
+    },
+    de: {
+      headerTitle: 'Ihren Termin verwalten',
+      headerSubtitle: 'Termin verschieben oder stornieren',
+      verifyHeading: 'Buchung bestätigen',
+      verifyHint: 'Geben Sie die Bestätigungsnummer und den Zugangscode aus Ihrer Bestätigungs-E-Mail ein.',
+      labelConf: 'Bestätigungsnummer', labelPass: 'Zugangscode',
+      continueBtn: 'Weiter', verifying: 'Wird geprüft…',
+      overviewHeading: 'Ihre Buchung',
+      detailsHeading: 'Ihre Daten',
+      detailsHint: 'Hier können Sie Ihren Namen oder Ihre E-Mail-Adresse korrigieren.',
+      labelName: 'Vollständiger Name', labelEmail: 'E-Mail-Adresse',
+      saveChanges: 'Änderungen speichern', saving: 'Wird gespeichert…',
+      rescheduleBtn: 'Termin verschieben', cancelBtn: 'Termin stornieren',
+      changeDay2OnlyBtn: 'Nur Tag 2 ändern',
+      keepDay2Btn: 'Meinen bisherigen Termin für Tag 2 behalten',
+      rescheduleHeading: 'Neuen Termin wählen',
+      newDay1Heading: 'Schritt 1 — Neuen Termin für Tag 1 wählen',
+      newDay2Heading: 'Schritt 2 — Neuen Termin für Tag 2 wählen',
+      day1Empty: 'Derzeit sind keine Termine verfügbar.',
+      day2Empty: 'Keine passenden Termine für Tag 2 verfügbar. Bitte wählen Sie einen anderen Termin für Tag 1.',
+      confirmChangeHeading: 'Änderung bestätigen',
+      confirmReschedule: 'Verschiebung bestätigen',
+      back: 'Zurück', goBack: 'Zurück',
+      cancelHeading: 'Termin stornieren',
+      cancelWarning: 'Dadurch werden beide Termine freigegeben. Dies kann nicht rückgängig gemacht werden.',
+      confirmCancel: 'Ja, Termin stornieren',
+      availHeading: 'Möchten Sie uns mitteilen, wann Sie wieder verfügbar sind?',
+      availHint: 'Dies ist freiwillig. Es hilft uns, Sie zu kontaktieren, wenn ein passender Termin frei wird.',
+      labelAvailDate: 'Datum hinzufügen, an dem Sie verfügbar sind',
+      add: 'Hinzufügen', submitDates: 'Diese Termine senden', dontKnow: 'Ich weiß es noch nicht',
+      doneHeading: 'Fertig', contactHeading: 'Kontakt',
+      loading: 'Wird geladen…',
+      day1Label: 'Tag 1', day2Label: 'Tag 2',
+      nameLabel: 'Name', emailLabel: 'E-Mail', staffLabel: 'Zuständige Person',
+      commentsLabel: 'Ihre Anmerkungen', confLabel: 'Bestätigungsnummer',
+      oldAppt: 'Bisheriger Termin', newAppt: 'Neuer Termin',
+      pickDateFirst: 'Bitte wählen Sie zuerst ein Datum.',
+      dateAlready: 'Dieses Datum ist bereits in der Liste.'
+    }
+  };
+
+  var state = {
+    lang: 'en',
+    conf: '',
+    pass: '',
+    booking: null,
+    newDay1: null,
+    newDay2: null,
+    day2OnlyMode: false,  // true when using the "Change Day 2 Only" quick path
+    keepDay2: false,      // true when the participant chose to keep their current Day 2
+    availability: []
+  };
+
+  var els = {};
+
+  document.addEventListener('DOMContentLoaded', function () {
+    [
+      'mHeaderTitle','mHeaderSubtitle','mLanguageSection','mLanguageHeading','mBtnEnglish','mBtnGerman',
+      'mMessageBanner','mVerifySection','mVerifyHeading','mVerifyHint','mVerifyForm','mConfNumber',
+      'mPasscode','mLabelConf','mLabelPass','mVerifyBtn','mVerifyBtnText','mVerifySpinner',
+      'mOverviewSection','mOverviewHeading','mBookingDetails','mDetailsHeading','mDetailsHint',
+      'mName','mEmail','mLabelName','mLabelEmail','mSaveDetailsBtn','mSaveDetailsBtnText',
+      'mRescheduleBtn','mChangeDay2OnlyBtn','mCancelBtn',
+      'mRescheduleSection','mRescheduleHeading','mNewDay1Block','mNewDay1Heading','mDay1Loading',
+      'mDay1Empty','mDay1Container','mNewDay2Block','mNewDay2Heading','mKeepDay2Btn','mDay2Loading','mDay2Empty',
+      'mDay2Container','mRescheduleConfirmBlock','mConfirmChangeHeading','mChangeSummary',
+      'mConfirmRescheduleBtn','mConfirmRescheduleBtnText','mRescheduleSpinner','mRescheduleBackBtn',
+      'mCancelSection','mCancelHeading','mCancelDetails','mCancelWarning','mConfirmCancelBtn',
+      'mConfirmCancelBtnText','mCancelSpinner','mCancelBackBtn',
+      'mAvailabilitySection','mAvailHeading','mAvailHint','mLabelAvailDate','mAvailDate','mAddDateBtn',
+      'mAvailList','mSubmitAvailBtn','mSubmitAvailBtnText','mAvailSpinner','mDontKnowBtn',
+      'mDonePanel','mDoneHeading','mDoneDetails','mContactHeading','mContactEmail','mContactPhone',
+      'projectIdBanner'
+    ].forEach(function (id) { els[id] = document.getElementById(id); });
+
+    els.mBtnEnglish.addEventListener('click', function () { chooseLang_('en'); });
+    els.mBtnGerman.addEventListener('click', function () { chooseLang_('de'); });
+    els.mVerifyForm.addEventListener('submit', onVerify_);
+    els.mSaveDetailsBtn.addEventListener('click', onSaveDetails_);
+    els.mRescheduleBtn.addEventListener('click', onStartReschedule_);
+    els.mChangeDay2OnlyBtn.addEventListener('click', onStartChangeDay2Only_);
+    els.mKeepDay2Btn.addEventListener('click', onKeepDay2_);
+    els.mCancelBtn.addEventListener('click', onStartCancel_);
+    els.mRescheduleBackBtn.addEventListener('click', function () { showOnly_(els.mOverviewSection); });
+    els.mCancelBackBtn.addEventListener('click', function () { showOnly_(els.mOverviewSection); });
+    els.mConfirmRescheduleBtn.addEventListener('click', onConfirmReschedule_);
+    els.mConfirmCancelBtn.addEventListener('click', onConfirmCancel_);
+    els.mAddDateBtn.addEventListener('click', onAddDate_);
+    els.mSubmitAvailBtn.addEventListener('click', function () { submitAvailability_(false); });
+    els.mDontKnowBtn.addEventListener('click', function () { submitAvailability_(true); });
+    loadProjectIdBanner_();
+  });
+
+  function loadProjectIdBanner_() {
+    google.script.run
+      .withSuccessHandler(function (projectId) {
+        if (!els.projectIdBanner) return;
+        if (projectId) {
+          els.projectIdBanner.textContent = 'Project: ' + projectId;
+          els.projectIdBanner.classList.remove('hidden');
+        } else {
+          els.projectIdBanner.classList.add('hidden');
+        }
+      })
+      .withFailureHandler(function () { /* non-critical, ignore */ })
+      .getProjectId();
+  }
+
+  function tr_(key) { return (T[state.lang] && T[state.lang][key]) || T.en[key] || key; }
+
+  function chooseLang_(lang) {
+    state.lang = lang;
+    applyLanguage_();
+    hide_(els.mLanguageSection);
+    show_(els.mVerifySection);
+  }
+
+  function applyLanguage_() {
+    var map = {
+      mHeaderTitle:'headerTitle', mHeaderSubtitle:'headerSubtitle',
+      mVerifyHeading:'verifyHeading', mVerifyHint:'verifyHint',
+      mLabelConf:'labelConf', mLabelPass:'labelPass', mVerifyBtnText:'continueBtn',
+      mOverviewHeading:'overviewHeading', mDetailsHeading:'detailsHeading', mDetailsHint:'detailsHint',
+      mLabelName:'labelName', mLabelEmail:'labelEmail', mSaveDetailsBtnText:'saveChanges',
+      mRescheduleBtn:'rescheduleBtn', mChangeDay2OnlyBtn:'changeDay2OnlyBtn', mCancelBtn:'cancelBtn',
+      mKeepDay2Btn:'keepDay2Btn',
+      mRescheduleHeading:'rescheduleHeading', mNewDay1Heading:'newDay1Heading',
+      mNewDay2Heading:'newDay2Heading', mDay1Empty:'day1Empty', mDay2Empty:'day2Empty',
+      mConfirmChangeHeading:'confirmChangeHeading', mConfirmRescheduleBtnText:'confirmReschedule',
+      mRescheduleBackBtn:'back', mCancelHeading:'cancelHeading', mCancelWarning:'cancelWarning',
+      mConfirmCancelBtnText:'confirmCancel', mCancelBackBtn:'goBack',
+      mAvailHeading:'availHeading', mAvailHint:'availHint', mLabelAvailDate:'labelAvailDate',
+      mAddDateBtn:'add', mSubmitAvailBtnText:'submitDates', mDontKnowBtn:'dontKnow',
+      mDoneHeading:'doneHeading', mContactHeading:'contactHeading',
+      mDay1Loading:'loading', mDay2Loading:'loading'
+    };
+    Object.keys(map).forEach(function (id) {
+      if (els[id]) els[id].textContent = tr_(map[id]);
+    });
+  }
+
+  // -------------------------------------------------------------------
+  // Verification
+  // -------------------------------------------------------------------
+
+  function onVerify_(evt) {
+    evt.preventDefault();
+    clearMessage_();
+    var conf = els.mConfNumber.value.trim();
+    var pass = els.mPasscode.value.trim();
+    if (!conf || !pass) return;
+
+    setBusy_(els.mVerifyBtn, els.mVerifyBtnText, els.mVerifySpinner, true, tr_('verifying'));
+    google.script.run
+      .withSuccessHandler(function (res) {
+        setBusy_(els.mVerifyBtn, els.mVerifyBtnText, els.mVerifySpinner, false, tr_('continueBtn'));
+        if (res && res.success) {
+          state.conf = conf;
+          state.pass = pass;
+          state.booking = res.booking;
+          els.mPasscode.value = '';
+          renderBooking_();
+          showOnly_(els.mOverviewSection);
+        } else {
+          showError_((res && res.message) || 'Verification failed.');
+        }
+      })
+      .withFailureHandler(function (err) {
+        setBusy_(els.mVerifyBtn, els.mVerifyBtnText, els.mVerifySpinner, false, tr_('continueBtn'));
+        showError_(errText_(err));
+      })
+      .verifyBookingAccess(conf, pass, state.lang);
+  }
+
+  /** Renders booking details. Slot IDs — and assigned staff — are deliberately never shown. */
+  function apptHtml_(label, appt) {
+    if (!appt) return '';
+    return '<div><span class="row-label">' + label + ':</span> ' +
+      esc_(appt.date) + ', ' + esc_(appt.startTime) + ' – ' + esc_(appt.endTime) + '</div>';
+  }
+
+  function renderBooking_() {
+    var b = state.booking;
+    var html =
+      '<div><span class="row-label">' + tr_('confLabel') + ':</span> ' + esc_(b.confirmationNumber) + '</div>' +
+      '<div><span class="row-label">' + tr_('nameLabel') + ':</span> ' + esc_(b.name) + '</div>' +
+      '<div><span class="row-label">' + tr_('emailLabel') + ':</span> ' + esc_(b.email) + '</div>' +
+      apptHtml_(tr_('day1Label'), b.day1) +
+      apptHtml_(tr_('day2Label'), b.day2);
+    if (b.comments) {
+      html += '<div><span class="row-label">' + tr_('commentsLabel') + ':</span> ' + esc_(b.comments) + '</div>';
+    }
+    els.mBookingDetails.innerHTML = html;
+    els.mName.value = b.name;
+    els.mEmail.value = b.email;
+  }
+
+  function onSaveDetails_() {
+    clearMessage_();
+    els.mSaveDetailsBtn.disabled = true;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        els.mSaveDetailsBtn.disabled = false;
+        if (res && res.success) {
+          state.booking = res.booking;
+          renderBooking_();
+          showSuccess_(res.message);
+        } else {
+          showError_((res && res.message) || 'Could not save.');
+        }
+      })
+      .withFailureHandler(function (err) {
+        els.mSaveDetailsBtn.disabled = false;
+        showError_(errText_(err));
+      })
+      .updateParticipantDetails(state.conf, state.pass, els.mName.value, els.mEmail.value, state.lang);
+  }
+
+  // -------------------------------------------------------------------
+  // Reschedule
+  // -------------------------------------------------------------------
+
+  function onStartReschedule_() {
+    clearMessage_();
+    state.day2OnlyMode = false;
+    state.keepDay2 = false;
+    state.newDay1 = null;
+    state.newDay2 = null;
+    show_(els.mNewDay1Block);
+    hide_(els.mKeepDay2Btn);
+    hide_(els.mNewDay2Block);
+    hide_(els.mRescheduleConfirmBlock);
+    els.mDay1Container.innerHTML = '';
+    hide_(els.mDay1Empty);
+    show_(els.mDay1Loading);
+    showOnly_(els.mRescheduleSection);
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        hide_(els.mDay1Loading);
+        if (!res || !res.success) { showError_((res && res.message) || 'Could not load slots.'); return; }
+        if (!res.slots.length) { show_(els.mDay1Empty); return; }
+        res.slots.forEach(function (slot) {
+          els.mDay1Container.appendChild(slotCard_(slot, function () { onPickDay1_(slot); }));
+        });
+      })
+      .withFailureHandler(function (err) { hide_(els.mDay1Loading); showError_(errText_(err)); })
+      .getRescheduleDay1Options(state.conf, state.pass, state.lang);
+  }
+
+  /** Quick path: change only Day 2, keeping the current Day 1 appointment. */
+  function onStartChangeDay2Only_() {
+    clearMessage_();
+    state.day2OnlyMode = true;
+    state.keepDay2 = false;
+    state.newDay1 = null; // null + day2OnlyMode means "Day 1 stays as-is"
+    state.newDay2 = null;
+    hide_(els.mNewDay1Block);
+    hide_(els.mKeepDay2Btn);
+    hide_(els.mRescheduleConfirmBlock);
+    els.mDay2Container.innerHTML = '';
+    hide_(els.mDay2Empty);
+    show_(els.mNewDay2Block);
+    show_(els.mDay2Loading);
+    showOnly_(els.mRescheduleSection);
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        hide_(els.mDay2Loading);
+        if (!res || !res.success) { showError_((res && res.message) || 'Could not load slots.'); return; }
+        if (!res.slots.length) { show_(els.mDay2Empty); return; }
+        res.slots.forEach(function (s2) {
+          els.mDay2Container.appendChild(slotCard_(s2, function () { onPickDay2_(s2); }));
+        });
+      })
+      .withFailureHandler(function (err) { hide_(els.mDay2Loading); showError_(errText_(err)); })
+      .getRescheduleDay2OptionsForCurrentDay1(state.conf, state.pass, state.lang);
+  }
+
+  function onPickDay1_(slot) {
+    state.newDay1 = slot;
+    state.newDay2 = null;
+    state.keepDay2 = false;
+    markSelected_(els.mDay1Container, slot);
+    hide_(els.mRescheduleConfirmBlock);
+    hide_(els.mKeepDay2Btn);
+    els.mDay2Container.innerHTML = '';
+    hide_(els.mDay2Empty);
+    show_(els.mNewDay2Block);
+    show_(els.mDay2Loading);
+
+    // Check whether the CURRENT Day 2 appointment is still compatible with
+    // this new Day 1 pick — if so, offer to just keep it instead of forcing
+    // a new Day 2 selection.
+    google.script.run
+      .withSuccessHandler(function (compat) {
+        if (compat && compat.success && compat.compatible) {
+          state.currentDay2Compat = compat.currentDay2;
+          show_(els.mKeepDay2Btn);
+        } else {
+          hide_(els.mKeepDay2Btn);
+        }
+      })
+      .withFailureHandler(function () { hide_(els.mKeepDay2Btn); })
+      .checkCurrentDay2StillCompatible(state.conf, state.pass, slot.slotID, state.lang);
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        hide_(els.mDay2Loading);
+        if (!res || !res.success) { showError_((res && res.message) || 'Could not load slots.'); return; }
+        if (!res.slots.length) { show_(els.mDay2Empty); return; }
+        res.slots.forEach(function (s2) {
+          els.mDay2Container.appendChild(slotCard_(s2, function () { onPickDay2_(s2); }));
+        });
+      })
+      .withFailureHandler(function (err) { hide_(els.mDay2Loading); showError_(errText_(err)); })
+      .getRescheduleDay2Options(state.conf, state.pass, slot.slotID, state.lang);
+  }
+
+  /** "Keep my current Day 2 appointment" — only Day 1 changes. */
+  function onKeepDay2_() {
+    state.keepDay2 = true;
+    state.newDay2 = null;
+    markSelected_(els.mDay2Container, {}); // clears any Day 2 card selection
+    showRescheduleSummary_();
+  }
+
+  function onPickDay2_(slot) {
+    state.newDay2 = slot;
+    state.keepDay2 = false;
+    markSelected_(els.mDay2Container, slot);
+    showRescheduleSummary_();
+  }
+
+  function showRescheduleSummary_() {
+    var b = state.booking;
+    var newDay1Display = state.day2OnlyMode ? b.day1 : (state.newDay1 || b.day1);
+    var newDay2Display = state.keepDay2 ? (state.currentDay2Compat || b.day2) : (state.newDay2 || b.day2);
+
+    els.mChangeSummary.innerHTML =
+      '<div><span class="row-label">' + tr_('oldAppt') + '</span></div>' +
+      apptHtml_(tr_('day1Label'), b.day1) + apptHtml_(tr_('day2Label'), b.day2) +
+      '<hr>' +
+      '<div><span class="row-label">' + tr_('newAppt') + '</span></div>' +
+      apptHtml_(tr_('day1Label'), newDay1Display) + apptHtml_(tr_('day2Label'), newDay2Display);
+    show_(els.mRescheduleConfirmBlock);
+    els.mRescheduleConfirmBlock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function onConfirmReschedule_() {
+    // Day 1 arg: empty string means "keep current" — that's true whenever
+    // we're in the Day-2-only quick path, or the participant never picked a
+    // new Day 1. Day 2 arg: empty string means "keep current" — true when
+    // the participant explicitly chose to keep their existing Day 2.
+    var day1Arg = (state.day2OnlyMode || !state.newDay1) ? '' : state.newDay1.slotID;
+    var day2Arg = (state.keepDay2 || !state.newDay2) ? '' : state.newDay2.slotID;
+    if (!day1Arg && !day2Arg) return; // nothing actually selected to change
+
+    clearMessage_();
+    setBusy_(els.mConfirmRescheduleBtn, els.mConfirmRescheduleBtnText, els.mRescheduleSpinner, true, tr_('saving'));
+    google.script.run
+      .withSuccessHandler(function (res) {
+        setBusy_(els.mConfirmRescheduleBtn, els.mConfirmRescheduleBtnText, els.mRescheduleSpinner, false, tr_('confirmReschedule'));
+        if (res && res.success) {
+          els.mDoneDetails.innerHTML =
+            '<div>' + esc_(res.message) + '</div>' +
+            '<div><span class="row-label">' + tr_('confLabel') + ':</span> ' + esc_(res.confirmationNumber) + '</div>' +
+            apptHtml_(tr_('day1Label'), res.newBooking.day1) +
+            apptHtml_(tr_('day2Label'), res.newBooking.day2);
+          renderContact_();
+          showOnly_(els.mDonePanel);
+        } else {
+          showError_((res && res.message) || 'Could not reschedule.');
+        }
+      })
+      .withFailureHandler(function (err) {
+        setBusy_(els.mConfirmRescheduleBtn, els.mConfirmRescheduleBtnText, els.mRescheduleSpinner, false, tr_('confirmReschedule'));
+        showError_(errText_(err));
+      })
+      .rescheduleBooking(state.conf, state.pass, day1Arg, day2Arg, state.lang);
+  }
+
+  // -------------------------------------------------------------------
+  // Cancel
+  // -------------------------------------------------------------------
+
+  function onStartCancel_() {
+    clearMessage_();
+    var b = state.booking;
+    els.mCancelDetails.innerHTML =
+      '<div><span class="row-label">' + tr_('nameLabel') + ':</span> ' + esc_(b.name) + '</div>' +
+      apptHtml_(tr_('day1Label'), b.day1) + apptHtml_(tr_('day2Label'), b.day2);
+    showOnly_(els.mCancelSection);
+  }
+
+  function onConfirmCancel_() {
+    clearMessage_();
+    setBusy_(els.mConfirmCancelBtn, els.mConfirmCancelBtnText, els.mCancelSpinner, true, tr_('saving'));
+    // Cancel immediately; availability is an optional follow-up step.
+    state.availability = [];
+    els.mAvailList.innerHTML = '';
+    setBusy_(els.mConfirmCancelBtn, els.mConfirmCancelBtnText, els.mCancelSpinner, false, tr_('confirmCancel'));
+    showOnly_(els.mAvailabilitySection);
+  }
+
+  function onAddDate_() {
+    var v = els.mAvailDate.value;
+    if (!v) { showError_(tr_('pickDateFirst')); return; }
+    if (state.availability.indexOf(v) !== -1) { showError_(tr_('dateAlready')); return; }
+    clearMessage_();
+    state.availability.push(v);
+    renderAvailability_();
+    els.mAvailDate.value = '';
+  }
+
+  function renderAvailability_() {
+    els.mAvailList.innerHTML = '';
+    state.availability.forEach(function (d, i) {
+      var li = document.createElement('li');
+      var span = document.createElement('span');
+      span.textContent = d;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.innerHTML = '&times;';
+      btn.addEventListener('click', function () {
+        state.availability.splice(i, 1);
+        renderAvailability_();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      els.mAvailList.appendChild(li);
+    });
+  }
+
+  function submitAvailability_(dontKnow) {
+    clearMessage_();
+    setBusy_(els.mSubmitAvailBtn, els.mSubmitAvailBtnText, els.mAvailSpinner, true, tr_('saving'));
+    els.mDontKnowBtn.disabled = true;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        setBusy_(els.mSubmitAvailBtn, els.mSubmitAvailBtnText, els.mAvailSpinner, false, tr_('submitDates'));
+        els.mDontKnowBtn.disabled = false;
+        if (res && res.success) {
+          els.mDoneDetails.innerHTML = '<div>' + esc_(res.message) + '</div>';
+          renderContact_();
+          showOnly_(els.mDonePanel);
+        } else {
+          showError_((res && res.message) || 'Could not cancel.');
+        }
+      })
+      .withFailureHandler(function (err) {
+        setBusy_(els.mSubmitAvailBtn, els.mSubmitAvailBtnText, els.mAvailSpinner, false, tr_('submitDates'));
+        els.mDontKnowBtn.disabled = false;
+        showError_(errText_(err));
+      })
+      .cancelBooking(state.conf, state.pass, dontKnow ? [] : state.availability, !!dontKnow, state.lang);
+  }
+
+  function renderContact_() {
+    var loc = (state.booking && state.booking.location) || {};
+    els.mContactEmail.textContent = 'altersstudie@lin-magdeburg.de';
+    els.mContactPhone.textContent = '+49 391 6263 92072';
+    if (loc.address) {
+      var d = document.createElement('div');
+      d.textContent = loc.address;
+      els.mContactPhone.parentNode.appendChild(d);
+    }
+  }
+
+  // -------------------------------------------------------------------
+  // Helpers
+  // -------------------------------------------------------------------
+
+  /** Builds a slot card. Slot IDs are intentionally not displayed. */
+  function slotCard_(slot, onClick) {
+    var card = document.createElement('div');
+    card.className = 'slot-card';
+    card.dataset.slotId = slot.slotID;
+
+    var dateEl = document.createElement('div');
+    dateEl.className = 'slot-date';
+    dateEl.textContent = slot.date;
+
+    var timeEl = document.createElement('div');
+    timeEl.className = 'slot-time';
+    timeEl.textContent = slot.startTime + ' – ' + slot.endTime;
+
+    card.appendChild(dateEl);
+    card.appendChild(timeEl);
+    card.addEventListener('click', onClick);
+    return card;
+  }
+
+  function markSelected_(container, slot) {
+    container.querySelectorAll('.slot-card').forEach(function (c) {
+      c.classList.toggle('selected', c.dataset.slotId === slot.slotID);
+    });
+  }
+
+  function showOnly_(section) {
+    [els.mVerifySection, els.mOverviewSection, els.mRescheduleSection,
+     els.mCancelSection, els.mAvailabilitySection, els.mDonePanel].forEach(hide_);
+    show_(section);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function setBusy_(btn, textEl, spinnerEl, busy, busyLabel) {
+    btn.disabled = busy;
+    if (busy) { show_(spinnerEl); textEl.textContent = busyLabel; }
+    else { hide_(spinnerEl); }
+  }
+
+  function esc_(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function showError_(text) {
+    els.mMessageBanner.textContent = text;
+    els.mMessageBanner.className = 'banner banner-error';
+  }
+  function showSuccess_(text) {
+    els.mMessageBanner.textContent = text;
+    els.mMessageBanner.className = 'banner banner-success';
+  }
+  function clearMessage_() {
+    els.mMessageBanner.textContent = '';
+    els.mMessageBanner.className = 'banner hidden';
+  }
+  function errText_(err) { return (err && err.message) || String(err || 'Unknown error'); }
+  function show_(el) { if (el) el.classList.remove('hidden'); }
+  function hide_(el) { if (el) el.classList.add('hidden'); }
+</script>

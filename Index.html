@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Experiment Scheduling</title>
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <!-- Round 10: Project ID banner — see Admin.html for the matching
+       control the Main Admin uses to set this. Display only. -->
+  <div id="projectIdBanner" class="project-id-banner hidden"></div>
+
+  <div class="app-container">
+
+    <header class="app-header">
+      <h1 id="headerTitle">Experiment Scheduling</h1>
+      <p class="subtitle" id="headerSubtitle">Book your two-day experiment session below.</p>
+    </header>
+
+    <!-- ============ LANGUAGE SELECTION (shown first) ============ -->
+    <section class="section" id="languageSection">
+      <h2 id="languageHeading">Please select your language / Bitte wählen Sie Ihre Sprache</h2>
+      <div class="language-options">
+        <button type="button" class="btn btn-language" id="btnEnglish">
+          <span class="lang-flag">EN</span> English
+        </button>
+        <button type="button" class="btn btn-language" id="btnGerman">
+          <span class="lang-flag">DE</span> Deutsch
+        </button>
+      </div>
+    </section>
+
+    <!-- Step indicator: hidden until a language is chosen -->
+    <div class="step-indicator hidden" id="stepIndicator">
+      <div class="step active" data-step="1">
+        <span class="step-num">1</span>
+        <span class="step-label" id="stepLabel1">Day 1</span>
+      </div>
+      <div class="step" data-step="2">
+        <span class="step-num">2</span>
+        <span class="step-label" id="stepLabel2">Day 2</span>
+      </div>
+      <div class="step" data-step="3">
+        <span class="step-num">3</span>
+        <span class="step-label" id="stepLabel3">Details</span>
+      </div>
+    </div>
+
+    <!-- General purpose message banner for errors / info, shown by JS -->
+    <div id="messageBanner" class="banner hidden" role="alert"></div>
+
+    <!-- Main booking flow. Hidden until a language is chosen, and again
+         hidden in its entirety once booking succeeds. -->
+    <div id="bookingFlow" class="hidden">
+
+      <!-- ============ STEP 1: DAY 1 SLOT SELECTION ============ -->
+      <section class="section" id="day1Section">
+        <h2 id="day1Heading">Choose a Day 1 Slot</h2>
+        <p class="section-hint" id="day1Hint">Select an available session for the first day.</p>
+        <div id="day1Loading" class="loading">Loading available Day 1 slots…</div>
+        <div id="day1Empty" class="empty-message hidden">
+          No Day 1 slots are currently available. Please check back later.
+        </div>
+        <div id="day1Container" class="slot-grid"></div>
+      </section>
+
+      <!-- ============ STEP 2: DAY 2 SLOT SELECTION ============ -->
+      <section class="section hidden" id="day2Section">
+        <h2 id="day2Heading">Choose a Compatible Day 2 Slot</h2>
+        <p class="section-hint" id="day2Hint">Only slots compatible with your Day 1 choice are shown.</p>
+        <div id="day2Loading" class="loading hidden">Loading compatible Day 2 slots…</div>
+        <div id="day2Empty" class="empty-message hidden">
+          No compatible Day 2 slots remain for this Day 1 slot.
+          Please select a different Day 1 slot above.
+        </div>
+        <div id="day2Container" class="slot-grid"></div>
+      </section>
+
+      <!-- ============ STEP 3: PARTICIPANT DETAILS ============ -->
+      <section class="section hidden" id="detailsSection">
+        <h2 id="detailsHeading">Your Details</h2>
+
+        <div class="selection-summary" id="selectionSummary"></div>
+
+        <form id="bookingForm" novalidate>
+          <div class="form-group">
+            <label for="participantTitle" id="labelTitle">Title</label>
+            <select id="participantTitle" name="title" required>
+              <option value="" id="titlePlaceholderOption">Select a title&hellip;</option>
+              <option value="Mr.">Mr.</option>
+              <option value="Ms.">Ms.</option>
+              <option value="Mrs.">Mrs.</option>
+              <option value="Mx.">Mx.</option>
+              <option value="Dr.">Dr.</option>
+              <option value="Prof.">Prof.</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="participantGender" id="labelGender">Gender</label>
+            <select id="participantGender" name="gender" required>
+              <option value="" id="genderPlaceholderOption">Select&hellip;</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="participantFirstName" id="labelFirstName">First Name</label>
+            <input type="text" id="participantFirstName" name="firstName" autocomplete="given-name" required>
+          </div>
+          <div class="form-group">
+            <label for="participantLastName" id="labelLastName">Last Name</label>
+            <input type="text" id="participantLastName" name="lastName" autocomplete="family-name" required>
+          </div>
+          <div class="form-group">
+            <label for="participantEmail" id="labelEmail">Email Address</label>
+            <input type="email" id="participantEmail" name="email" autocomplete="email" required>
+          </div>
+
+          <div class="form-group">
+            <label for="participantComments" id="labelComments">Comments (optional)</label>
+            <textarea id="participantComments" rows="3" maxlength="2000"></textarea>
+            <p class="hint" id="commentsHint">Anything you would like us to know before your appointment?</p>
+          </div>
+          <button type="submit" id="submitBtn" class="btn btn-primary">
+            <span id="submitBtnText">Confirm Booking</span>
+            <span id="submitSpinner" class="spinner hidden"></span>
+          </button>
+        </form>
+      </section>
+    </div>
+
+    <!-- ============ CONFIRMATION PANEL (shown after success) ============ -->
+    <section class="section hidden" id="confirmationPanel">
+      <div class="confirmation-icon">&#10003;</div>
+      <h2 id="confirmedHeading">Booking Confirmed</h2>
+      <div id="confirmationDetails" class="confirmation-details"></div>
+
+      <div class="confirmation-location">
+        <div class="confirmation-location-heading" id="confLocationHeading">Location</div>
+        <div class="confirmation-address" id="confAddressText"></div>
+        <a id="confMapsLink" class="maps-link" href="#" target="_blank" rel="noopener">View on Google Maps</a>
+      </div>
+
+      <div id="credentialsBox" class="credentials-box hidden">
+        <strong id="credentialsHeading">Keep these details safe</strong>
+        <div><span id="confNumberLabel">Confirmation Number</span>: <strong id="confNumberValue"></strong></div>
+        <div><span id="passcodeLabel">Booking Passcode</span>: <strong id="passcodeValue"></strong></div>
+        <p class="hint" id="credentialsNote"></p>
+        <p><a id="manageLink" href="#" target="_blank"></a></p>
+      </div>
+      <p class="confirmation-note" id="confirmedNote">A confirmation email has been sent to your email address.</p>
+    </section>
+
+    <!-- ============ HELP / CONTACT (shown once a language is chosen) ============ -->
+    <section class="section hidden" id="helpSection">
+      <a href="#" class="maps-link" id="helpToggleLink">Confused? Write us a message</a>
+      <div id="helpFormBox" class="hidden" style="margin-top: 14px;">
+        <form id="helpForm" novalidate>
+          <div class="form-group">
+            <label for="helpName" id="helpLabelName">Your Name (optional)</label>
+            <input type="text" id="helpName" autocomplete="name">
+          </div>
+          <div class="form-group">
+            <label for="helpEmail" id="helpLabelEmail">Your Email</label>
+            <input type="email" id="helpEmail" autocomplete="email" required>
+          </div>
+          <div class="form-group">
+            <label for="helpMessage" id="helpLabelMessage">Your Message</label>
+            <textarea id="helpMessage" rows="4" required></textarea>
+          </div>
+          <button type="submit" id="helpSubmitBtn" class="btn btn-primary">
+            <span id="helpSubmitBtnText">Send</span>
+            <span id="helpSubmitSpinner" class="spinner hidden"></span>
+          </button>
+        </form>
+        <p class="confirmation-note hidden" id="helpSentNote"></p>
+      </div>
+    </section>
+
+  </div>
+
+  <?!= include('JavaScript'); ?>
+</body>
+</html>

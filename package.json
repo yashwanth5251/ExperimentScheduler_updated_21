@@ -1,0 +1,26 @@
+{
+  "name": "experiment-scheduler",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Experiment Scheduling System — local web port of the Google Apps Script app",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "seed": "node server/seed.js",
+    "dev": "node --watch server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "googleapis": "^144.0.0",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.16",
+    "pdfkit": "^0.15.2",
+    "puppeteer": "^23.11.1",
+    "uuid": "^11.0.5"
+  }
+}
