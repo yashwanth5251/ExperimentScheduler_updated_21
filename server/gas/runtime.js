@@ -101,6 +101,11 @@ function createRuntime(options) {
     }
   }
 
+  // Stateless signed admin sessions (required on Vercel — CacheService is not
+  // shared across serverless isolates, so UUID tokens looked "logged out"
+  // immediately after login).
+  patchAdminSessions_(sandbox);
+
   // Collect public API functions defined by Code.gs (no trailing underscore)
   const api = {};
   for (const key of Object.keys(sandbox)) {
@@ -124,6 +129,75 @@ function createRuntime(options) {
       }
       return sandbox[name].apply(null, args || []);
     }
+  };
+}
+
+function patchAdminSessions_(sandbox) {
+  const crypto = require('crypto');
+  const secret = process.env.SESSION_SECRET ||
+    process.env.ADMIN_DEFAULT_PASSWORD ||
+    'experiment-scheduler-session-v1';
+  const ttlSeconds = (sandbox.CONFIG && sandbox.CONFIG.ADMIN_SESSION_TTL_SECONDS) || 1800;
+
+  function b64url(buf) {
+    return Buffer.from(buf).toString('base64')
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  }
+
+  function signSession(session) {
+    const body = {
+      email: session.email,
+      name: session.name,
+      role: session.role,
+      exp: Date.now() + ttlSeconds * 1000
+    };
+    const payload = b64url(JSON.stringify(body));
+    const sig = b64url(crypto.createHmac('sha256', secret).update(payload).digest());
+    return 's.' + payload + '.' + sig;
+  }
+
+  function verifySignedToken(token) {
+    if (!token || String(token).indexOf('s.') !== 0) return null;
+    const parts = String(token).split('.');
+    if (parts.length !== 3) return null;
+    const payload = parts[1];
+    const sig = parts[2];
+    const expected = b64url(crypto.createHmac('sha256', secret).update(payload).digest());
+    if (sig !== expected) return null;
+    try {
+      const json = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+      const body = JSON.parse(json);
+      if (!body || !body.exp || Date.now() > body.exp) return null;
+      return { email: body.email, name: body.name, role: body.role };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  const originalRequire = sandbox.requireAdminAuth_;
+  sandbox.requireAdminAuth_ = function (token) {
+    const signed = verifySignedToken(token);
+    if (signed) return signed;
+    return originalRequire(token);
+  };
+
+  const originalLogin = sandbox.adminLogin;
+  sandbox.adminLogin = function (email, password) {
+    const result = originalLogin(email, password);
+    if (result && result.success && result.email) {
+      result.token = signSession({
+        email: result.email,
+        name: result.name,
+        role: result.role
+      });
+    }
+    return result;
+  };
+
+  const originalLogout = sandbox.adminLogout;
+  sandbox.adminLogout = function (token) {
+    if (verifySignedToken(token)) return { success: true };
+    return originalLogout(token);
   };
 }
 

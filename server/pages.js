@@ -9,19 +9,25 @@ const SHIM = `
   function createRunner() {
     var success = null;
     var failure = null;
+    var proxy = null;
     var runner = {
-      withSuccessHandler: function (fn) { success = fn; return runner; },
-      withFailureHandler: function (fn) { failure = fn; return runner; }
+      withSuccessHandler: function (fn) { success = fn; return proxy; },
+      withFailureHandler: function (fn) { failure = fn; return proxy; }
     };
-    return new Proxy(runner, {
+    proxy = new Proxy(runner, {
       get: function (target, prop) {
-        if (prop in target) return target[prop];
+        if (prop === 'withSuccessHandler' || prop === 'withFailureHandler') {
+          return target[prop];
+        }
+        if (prop === 'then' || prop === 'catch' || prop === 'finally' || prop === 'toJSON') {
+          return undefined;
+        }
         return function () {
           var args = Array.prototype.slice.call(arguments);
           return fetch('/api/run', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ functionName: prop, args: args })
+            body: JSON.stringify({ functionName: String(prop), args: args })
           }).then(function (res) {
             return res.json().then(function (body) {
               if (!res.ok || body.error) {
@@ -40,6 +46,7 @@ const SHIM = `
         };
       }
     });
+    return proxy;
   }
   window.google = window.google || {};
   window.google.script = window.google.script || {};
