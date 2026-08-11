@@ -2,6 +2,11 @@
 
 const nodemailer = require('nodemailer');
 
+function isDemoMode() {
+  return String(process.env.ALLOW_INSECURE_DEMO || '').toLowerCase() === 'true' ||
+    String(process.env.ALLOW_INSECURE_DEMO || '') === '1';
+}
+
 function requireEnv(name) {
   const v = process.env[name];
   if (!v) throw new Error('Missing required env var: ' + name);
@@ -9,13 +14,19 @@ function requireEnv(name) {
 }
 
 function createMailApp(logger) {
-  requireEnv('SMTP_HOST');
-  requireEnv('SMTP_PORT');
-  requireEnv('SMTP_USER');
-  requireEnv('SMTP_PASS');
-  requireEnv('SMTP_FROM');
+  const demo = isDemoMode() || !process.env.SMTP_HOST;
 
-  const transporter = nodemailer.createTransport({
+  if (!demo) {
+    requireEnv('SMTP_HOST');
+    requireEnv('SMTP_PORT');
+    requireEnv('SMTP_USER');
+    requireEnv('SMTP_PASS');
+    requireEnv('SMTP_FROM');
+  } else if (logger) {
+    logger.log('MailApp running in DEMO mode — emails are logged, not sent.');
+  }
+
+  const transporter = demo ? null : nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT, 10),
     secure: String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true',
@@ -46,7 +57,7 @@ function createMailApp(logger) {
       const msg = normalizeArgs(a, b, c);
       const to = Array.isArray(msg.to) ? msg.to.join(',') : String(msg.to || '');
       const mail = {
-        from: process.env.SMTP_FROM,
+        from: process.env.SMTP_FROM || 'demo@localhost',
         to,
         subject: msg.subject || '',
         text: msg.body || '',
@@ -55,7 +66,14 @@ function createMailApp(logger) {
         bcc: msg.bcc,
         replyTo: msg.replyTo
       };
-      // Apps Script is synchronous; nodemailer is async. Use a blocking sync send via deasync pattern.
+
+      if (demo || !transporter) {
+        if (logger) {
+          logger.log('[DEMO EMAIL] to=' + mail.to + ' subject=' + mail.subject);
+        }
+        return;
+      }
+
       const { execFileSync } = require('child_process');
       const path = require('path');
       const fs = require('fs');
@@ -83,8 +101,8 @@ function createMailApp(logger) {
         try { fs.unlinkSync(tmp); } catch (e) { /* ignore */ }
       }
     },
-    // Async verify for startup
     verify() {
+      if (!transporter) return Promise.resolve(true);
       return transporter.verify();
     }
   };

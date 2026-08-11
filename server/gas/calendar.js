@@ -94,7 +94,45 @@ function syncCall(fn) {
   }
 }
 
+function createNoopCalendar(logger) {
+  let seq = 0;
+  function makeEvent(title, description) {
+    const id = 'demo-event-' + (++seq);
+    return {
+      getId() { return id; },
+      getDescription() { return description || ''; },
+      setColor() { return this; },
+      deleteEvent() { /* noop */ }
+    };
+  }
+  return {
+    createEvent(title, start, end, options) {
+      if (logger) logger.log('[DEMO CALENDAR] createEvent: ' + title);
+      return makeEvent(title, options && options.description);
+    },
+    getEventById() { return null; },
+    getEvents() { return []; }
+  };
+}
+
 function createCalendarApp(logger) {
+  const demo = String(process.env.ALLOW_INSECURE_DEMO || '').toLowerCase() === 'true' ||
+    String(process.env.ALLOW_INSECURE_DEMO || '') === '1' ||
+    (!process.env.GOOGLE_SERVICE_ACCOUNT_FILE && !process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+
+  if (demo) {
+    if (logger) logger.log('CalendarApp running in DEMO mode — events are logged, not created.');
+    const noop = createNoopCalendar(logger);
+    return {
+      getDefaultCalendar() { return noop; },
+      getCalendarById() { return noop; },
+      EventColor: {
+        PALE_BLUE: '1', PALE_GREEN: '2', MAUVE: '3', PALE_RED: '4', YELLOW: '5',
+        ORANGE: '6', CYAN: '7', GRAY: '8', BLUE: '9', GREEN: '10', RED: '11'
+      }
+    };
+  }
+
   // Validate credentials exist at startup
   loadAuth();
 
@@ -120,7 +158,6 @@ function createCalendarApp(logger) {
           },
           sendUpdates: options.sendInvites ? 'all' : 'none'
         });
-        // Thin client for setColor/delete/getId — subsequent ops also go through syncCall
         return {
           getId() { return result.id || ''; },
           getDescription() { return result.description || ''; },
@@ -220,7 +257,6 @@ function createCalendarApp(logger) {
       if (!id) return null;
       const mapped = process.env.GOOGLE_PARTICIPANT_CALENDAR_ID || id;
       try {
-        // Probe access
         syncCall({ op: 'getCal', calendarId: mapped });
         return getCalendar(mapped);
       } catch (err) {

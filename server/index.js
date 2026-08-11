@@ -9,6 +9,9 @@ const { createRuntime } = require('./gas/runtime');
 const { renderTemplate } = require('./pages');
 
 const isVercel = !!(process.env.VERCEL || process.env.NOW_REGION);
+const isRender = !!process.env.RENDER;
+const demoMode = String(process.env.ALLOW_INSECURE_DEMO || '').toLowerCase() === 'true' ||
+  String(process.env.ALLOW_INSECURE_DEMO || '') === '1';
 
 function requireEnv(name) {
   if (!process.env[name]) {
@@ -19,7 +22,7 @@ function requireEnv(name) {
 function ensureGoogleCredentials() {
   if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
     const dest = path.join(
-      isVercel ? '/tmp' : path.join(__dirname, '..', 'credentials'),
+      (isVercel || isRender) ? '/tmp' : path.join(__dirname, '..', 'credentials'),
       'google-service-account.json'
     );
     fs.mkdirSync(path.dirname(dest), { recursive: true });
@@ -31,21 +34,27 @@ function ensureGoogleCredentials() {
     process.env.GOOGLE_SERVICE_ACCOUNT_FILE = dest;
     return;
   }
-  requireEnv('GOOGLE_SERVICE_ACCOUNT_FILE');
+  if (demoMode) return;
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_FILE) {
+    throw new Error('Missing GOOGLE_SERVICE_ACCOUNT_FILE or GOOGLE_SERVICE_ACCOUNT_JSON (or set ALLOW_INSECURE_DEMO=1)');
+  }
 }
 
-['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'].forEach(requireEnv);
+if (!demoMode) {
+  ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'].forEach(requireEnv);
+}
 ensureGoogleCredentials();
 
 const projectRoot = path.join(__dirname, '..');
-const detectedHost = process.env.VERCEL_URL
-  ? ('https://' + process.env.VERCEL_URL)
-  : (process.env.BASE_URL || 'http://localhost:3000');
-const baseUrl = detectedHost.replace(/\/$/, '');
+const detectedHost = process.env.RENDER_EXTERNAL_URL
+  || (process.env.VERCEL_URL ? ('https://' + process.env.VERCEL_URL) : null)
+  || process.env.BASE_URL
+  || 'http://localhost:3000';
+const baseUrl = String(detectedHost).replace(/\/$/, '');
 const timezone = process.env.SCRIPT_TIMEZONE || 'Europe/Berlin';
 const ownerEmail = process.env.ADMIN_OWNER_EMAIL || 'altersstudie@lin-magdeburg.de';
 
-const dataRoot = isVercel
+const dataRoot = (isVercel || process.env.USE_TMP_DATA === '1')
   ? '/tmp/experiment-scheduler'
   : path.join(projectRoot, 'data');
 const dbPath = process.env.DATABASE_PATH

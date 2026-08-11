@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: experiment-scheduler
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install --omit=optional
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ALLOW_INSECURE_DEMO
+        value: "1"
+      - key: ADMIN_OWNER_EMAIL
+        value: altersstudie@lin-magdeburg.de
+      - key: ADMIN_DEFAULT_PASSWORD
+        value: "123456"
+      - key: SCRIPT_TIMEZONE
+        value: Europe/Berlin
