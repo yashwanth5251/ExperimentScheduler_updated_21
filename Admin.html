@@ -124,29 +124,56 @@
     <!-- ============ DASHBOARD ============ -->
     <div id="dashboard" class="hidden">
 
-      <div class="dashboard-header">
-        <h2>Dashboard <span class="panel-subtitle" id="sessionInfo"></span></h2>
-        <div class="dashboard-actions">
-          <button type="button" class="btn btn-secondary" id="refreshBtn">Refresh</button>
-          <button type="button" class="btn btn-secondary" id="bookingsBtn">Bookings</button>
-          <button type="button" class="btn btn-secondary manage-bookings-only hidden" id="createBookingBtn">Create Booking</button>
-          <button type="button" class="btn btn-secondary blood-drawing-only hidden" id="bloodDrawingBtn">Blood Drawing</button>
-          <button type="button" class="btn btn-secondary ta-availability-only hidden" id="taAvailabilityBtn">TA Availability</button>
-          <button type="button" class="btn btn-secondary manage-roles-only hidden" id="manageRolesBtn">Manage Roles</button>
-          <button type="button" class="btn btn-secondary" id="postExpBtn">Post-Experiment Updates</button>
-          <button type="button" class="btn btn-secondary manage-slots-only hidden" id="bulkMriBtn">Add MRI Slots</button>
-          <button type="button" class="btn btn-secondary" id="combinationsBtn">Schedule Combinations</button>
-          <button type="button" class="btn btn-secondary" id="changePwBtn">Change Password</button>
-          <button type="button" class="btn btn-secondary hidden" id="manageAdminsBtn">Manage Admins</button>
-          <button type="button" class="btn btn-secondary hidden" id="recordsBtn">Records &amp; Audit</button>
-          <button type="button" class="btn btn-secondary hidden" id="emailTemplatesBtn">Email Templates</button>
-          <button type="button" class="btn btn-secondary hidden" id="calendarInvitesBtn">Calendar Invitations</button>
-          <button type="button" class="btn btn-secondary" id="logoutBtn">Log Out</button>
-        </div>
-      </div>
+      <div class="admin-workspace">
+        <div class="admin-sidebar-backdrop" id="adminSidebarBackdrop"></div>
+        <aside class="admin-sidebar" id="adminSidebar" aria-label="Admin navigation">
+          <div class="admin-sidebar-top">
+            <div class="admin-sidebar-title">Admin</div>
+            <p class="admin-sidebar-user" id="sessionInfo"></p>
+          </div>
 
+          <nav class="admin-sidebar-nav">
+            <div class="admin-nav-group">Scheduling</div>
+            <button type="button" class="admin-nav-item active" id="overviewNavBtn" data-admin-view="overview">Sessions &amp; Slots</button>
+            <button type="button" class="admin-nav-item" id="assignmentsNavBtn" data-admin-view="assignments">Assignments</button>
+            <button type="button" class="admin-nav-item manage-slots-only hidden" id="bulkMriBtn" data-admin-view="bulkMri">Add MRI Slots</button>
+
+            <div class="admin-nav-group">Appointments</div>
+            <button type="button" class="admin-nav-item" id="bookingsBtn" data-admin-view="bookings">Bookings &amp; Reschedule</button>
+            <button type="button" class="admin-nav-item manage-bookings-only hidden" id="createBookingBtn" data-admin-view="createBooking">Create Booking</button>
+            <button type="button" class="admin-nav-item blood-drawing-only hidden" id="bloodDrawingBtn" data-admin-view="bloodDrawing">Blood Drawing</button>
+            <button type="button" class="admin-nav-item ta-availability-only hidden" id="taAvailabilityBtn" data-admin-view="taAvailability">TA Availability</button>
+
+            <div class="admin-nav-group">People &amp; Access</div>
+            <button type="button" class="admin-nav-item hidden" id="manageAdminsBtn" data-admin-view="admins">Users &amp; Admins</button>
+            <button type="button" class="admin-nav-item manage-roles-only hidden" id="manageRolesBtn" data-admin-view="roles">Roles &amp; Permissions</button>
+
+            <div class="admin-nav-group">History &amp; Reports</div>
+            <button type="button" class="admin-nav-item hidden" id="recordsBtn" data-admin-view="records">Records &amp; History</button>
+            <button type="button" class="admin-nav-item" id="postExpBtn" data-admin-view="postExp">Post-Experiment</button>
+            <button type="button" class="admin-nav-item" id="combinationsBtn" data-admin-view="combinations">Schedule Combinations</button>
+
+            <div class="admin-nav-group">System</div>
+            <button type="button" class="admin-nav-item hidden" id="emailTemplatesBtn" data-admin-view="emailTemplates">Email Templates</button>
+            <button type="button" class="admin-nav-item hidden" id="calendarInvitesBtn" data-admin-view="calendarInvites">Calendar Invitations</button>
+            <button type="button" class="admin-nav-item" id="changePwBtn" data-admin-view="password">Change Password</button>
+          </nav>
+
+          <div class="admin-sidebar-footer">
+            <button type="button" class="btn btn-secondary btn-block" id="refreshBtn">Refresh data</button>
+            <button type="button" class="btn btn-secondary btn-block" id="logoutBtn">Log Out</button>
+          </div>
+        </aside>
+
+        <div class="admin-main">
+          <div class="admin-main-toolbar">
+            <button type="button" class="btn btn-secondary btn-small admin-sidebar-toggle" id="adminSidebarToggle" aria-label="Toggle menu">Menu</button>
+            <h2 class="admin-main-title" id="adminViewTitle">Sessions &amp; Slots</h2>
+          </div>
+
+          <div id="adminViewOverview" class="admin-view">
       <!-- ---- Day 1 overview ---- -->
-      <section class="panel">
+      <section class="panel" id="day1Panel">
         <h3>Day 1 Slots <span class="panel-subtitle">(today onward)</span></h3>
         <div class="form-row filter-toolbar">
           <div class="form-group">
@@ -290,7 +317,7 @@
         <div class="subform manage-slots-only">
           <h4>Create MRI Slots</h4>
           <p class="hint">
-            MRI slots are only created in bulk, via <strong>Add MRI Slots</strong> above — this
+            MRI slots are only created in bulk, via <strong>Add MRI Slots</strong> in the sidebar — this
             keeps every MRI slot going through the same overlap/conflict checks and, if you choose,
             lets you push it straight into a Day 1/Day 2 schedule in the same step.
           </p>
@@ -315,8 +342,47 @@
         <button type="button" class="btn btn-secondary" id="bulkDay2AddRowBtn">Add Row</button>
         <button type="button" class="btn btn-primary" id="bulkDay2SaveBtn">Create All Day 2 Slots</button>
       </section>
+          </div><!-- /adminViewOverview -->
 
-    </div>
+          <div id="adminViewAssignments" class="admin-view hidden">
+            <section class="panel">
+              <h3>Staff Assignments</h3>
+              <p class="hint">
+                Upcoming sessions with assigned staff and TAs. Use <strong>Edit</strong> on a row to reassign
+                people or adjust schedule details.
+              </p>
+              <div class="form-row filter-toolbar">
+                <div class="form-group">
+                  <label for="assignmentsSearch">Search</label>
+                  <input type="text" id="assignmentsSearch" placeholder="Staff, slot ID, date&hellip;">
+                </div>
+                <div class="form-group">
+                  <label for="assignmentsTypeFilter">Type</label>
+                  <select id="assignmentsTypeFilter">
+                    <option value="">All</option>
+                    <option value="DAY1">Day 1</option>
+                    <option value="DAY2">Day 2</option>
+                    <option value="MRI">MRI</option>
+                  </select>
+                </div>
+              </div>
+              <p class="empty-message hidden" id="assignmentsEmptyMsg">No assigned sessions from today onward.</p>
+              <div class="table-scroll"><table class="slot-table" id="assignmentsTable">
+                <thead>
+                  <tr>
+                    <th>Type</th><th>Slot ID</th><th>Date</th><th>Time</th>
+                    <th>Assigned</th><th>Status</th><th></th>
+                  </tr>
+                </thead>
+                <tbody id="assignmentsTableBody"></tbody>
+              </table></div>
+            </section>
+          </div>
+
+        </div><!-- /admin-main -->
+      </div><!-- /admin-workspace -->
+
+    </div><!-- /dashboard -->
 
     <!-- ============ SCHEDULE BUILDER MODAL (MRI -> Day 1 -> Day 2) ============ -->
     <div class="modal-overlay hidden" id="scheduleModalOverlay">

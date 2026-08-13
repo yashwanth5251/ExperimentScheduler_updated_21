@@ -51,6 +51,8 @@
 
   var els = {};
   var ADMIN_SESSION_KEY_ = 'es_admin_session';
+  var pendingShellSession_ = null;
+  var adminUiReady_ = false;
 
   function isEmbedded_() {
     try {
@@ -92,54 +94,103 @@
       if (!raw) return;
       var saved = JSON.parse(raw);
       if (!saved || !saved.token) return;
-      state.token = saved.token;
-      state.session = {
-        email: saved.email,
-        name: saved.name,
-        role: saved.role,
-        permissions: saved.permissions || []
-      };
-      if (els.sessionInfo) {
-        els.sessionInfo.textContent = state.session.name + ' — ' + state.session.role;
-      }
-      hide_(els.loginSection);
-      show_(els.dashboard);
-      applyPermissionVisibility_();
-      // Defer data loads until after the rest of DOMContentLoaded wiring
-      setTimeout(function () {
-        loadStaffOptions_();
-        loadOverview_();
-        startAutoRefresh_();
-      }, 0);
+      applyExternalSession_(saved);
     } catch (e) { /* ignore */ }
   }
 
   window.addEventListener('message', function (evt) {
     var data = evt.data || {};
+    if (data.type === 'es-admin-session' && data.session && data.session.token) {
+      if (!adminUiReady_) {
+        pendingShellSession_ = data.session;
+        return;
+      }
+      applyExternalSession_(data.session);
+    }
     if (data.type === 'es-admin-logout') {
       stopAutoRefresh_();
       state.token = null;
       state.session = null;
-      hide_(els.dashboard);
-      show_(els.loginSection);
+      pendingShellSession_ = null;
+      if (adminUiReady_) {
+        hide_(els.dashboard);
+        if (!isEmbedded_()) show_(els.loginSection);
+      }
     }
   });
 
+  function applyExternalSession_(saved) {
+    if (!saved || !saved.token) return;
+    if (!adminUiReady_) {
+      pendingShellSession_ = saved;
+      return;
+    }
+    var wasLoggedIn = !!state.token;
+    state.token = saved.token;
+    state.session = {
+      email: saved.email,
+      name: saved.name,
+      role: saved.role,
+      permissions: saved.permissions || []
+    };
+    try { sessionStorage.setItem(ADMIN_SESSION_KEY_, JSON.stringify(saved)); } catch (e) { /* ignore */ }
+    if (els.sessionInfo) {
+      els.sessionInfo.textContent = state.session.name + ' — ' + state.session.role;
+    }
+    hide_(els.loginSection);
+    show_(els.dashboard);
+    applyPermissionVisibility_();
+    if (!wasLoggedIn) {
+      loadStaffOptions_();
+      loadOverview_();
+      startAutoRefresh_();
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     cacheElements_();
-    restoreShellSession_();
+    adminUiReady_ = true;
+    if (isEmbedded_()) {
+      // Parent shell owns login — hide the duplicate admin login panel.
+      hide_(els.loginSection);
+      document.body.classList.add('embed-admin');
+    }
+    if (pendingShellSession_) {
+      applyExternalSession_(pendingShellSession_);
+      pendingShellSession_ = null;
+    } else {
+      restoreShellSession_();
+    }
     loadAdminContext_();
     loadProjectIdBanner_();
-
-    // If opened inside the unified shell without a session, ask parent to log in
-    if (isEmbedded_() && !state.token) {
-      try { parent.postMessage({ type: 'es-request-login' }, '*'); } catch (e) { /* ignore */ }
-    }
 
     els.loginForm.addEventListener('submit', onLogin_);
     els.refreshBtn.addEventListener('click', loadOverview_);
     els.logoutBtn.addEventListener('click', onLogout_);
     els.projectIdSaveBtn.addEventListener('click', onSaveProjectId_);
+
+    if (els.overviewNavBtn) {
+      els.overviewNavBtn.addEventListener('click', showOverviewWorkspace_);
+    }
+    if (els.assignmentsNavBtn) {
+      els.assignmentsNavBtn.addEventListener('click', showAssignmentsView_);
+    }
+    if (els.adminSidebarToggle) {
+      els.adminSidebarToggle.addEventListener('click', function () {
+        var workspace = document.querySelector('.admin-workspace');
+        if (workspace && workspace.classList.contains('sidebar-open')) closeMobileSidebar_();
+        else openMobileSidebar_();
+      });
+    }
+    if (els.adminSidebarBackdrop) {
+      els.adminSidebarBackdrop.addEventListener('click', closeMobileSidebar_);
+    }
+    if (els.assignmentsSearch) {
+      els.assignmentsSearch.addEventListener('input', renderAssignmentsTable_);
+    }
+    if (els.assignmentsTypeFilter) {
+      els.assignmentsTypeFilter.addEventListener('change', renderAssignmentsTable_);
+    }
 
     els.forgotPasswordLink.addEventListener('click', function (e) { e.preventDefault(); openForgotPassword_(); });
     els.fpBackBtn1.addEventListener('click', closeForgotPassword_);
@@ -147,18 +198,26 @@
     els.fpRequestBtn.addEventListener('click', onForgotPasswordRequest_);
     els.fpConfirmBtn.addEventListener('click', onForgotPasswordConfirm_);
 
-    els.changePwBtn.addEventListener('click', openPwModal_);
-    els.pwCancelBtn1.addEventListener('click', closePwModal_);
-    els.pwCancelBtn2.addEventListener('click', closePwModal_);
+    els.changePwBtn.addEventListener('click', function () {
+      setActiveNav_('password');
+      closeMobileSidebar_();
+      openPwModal_();
+    });
+    els.pwCancelBtn1.addEventListener('click', function () { closePwModal_(); showOverviewWorkspace_(); });
+    els.pwCancelBtn2.addEventListener('click', function () { closePwModal_(); showOverviewWorkspace_(); });
     els.pwRequestBtn.addEventListener('click', onRequestPasswordChange_);
     els.pwConfirmBtn.addEventListener('click', onConfirmPasswordChange_);
 
-    els.manageAdminsBtn.addEventListener('click', openAdminsModal_);
-    els.adminsCloseBtn.addEventListener('click', function () { hide_(els.adminsModalOverlay); });
+    els.manageAdminsBtn.addEventListener('click', function () {
+      openFeaturePanel_(els.adminsModalOverlay, openAdminsModal_, 'admins');
+    });
+    els.adminsCloseBtn.addEventListener('click', function () { returnFromFeaturePanel_(els.adminsModalOverlay); });
     els.createAdminBtn.addEventListener('click', onCreateAdmin_);
 
-    els.bookingsBtn.addEventListener('click', openBookingsModal_);
-    els.bookingsCloseBtn.addEventListener('click', function () { hide_(els.bookingsModalOverlay); });
+    els.bookingsBtn.addEventListener('click', function () {
+      openFeaturePanel_(els.bookingsModalOverlay, openBookingsModal_, 'bookings');
+    });
+    els.bookingsCloseBtn.addEventListener('click', function () { returnFromFeaturePanel_(els.bookingsModalOverlay); });
     els.bookingRescheduleCancelBtn.addEventListener('click', function () { hide_(els.bookingRescheduleModalOverlay); });
     els.bookingRescheduleSaveBtn.addEventListener('click', onSaveBookingReschedule_);
     els.bookingCancelAddDateBtn.addEventListener('click', onAddBookingCancelDate_);
@@ -199,13 +258,17 @@
     els.editScheduleSaveBtn.addEventListener('click', onSaveEditSchedule_);
 
     // ---- 2026-08 requirements pass: new panels ----
-    els.createBookingBtn.addEventListener('click', openCreateBookingModal_);
-    els.cbCancelBtn.addEventListener('click', function () { hide_(els.createBookingModalOverlay); });
+    els.createBookingBtn.addEventListener('click', function () {
+      openFeaturePanel_(els.createBookingModalOverlay, openCreateBookingModal_, 'createBooking');
+    });
+    els.cbCancelBtn.addEventListener('click', function () { returnFromFeaturePanel_(els.createBookingModalOverlay); });
     els.cbDay1Select.addEventListener('change', onCbDay1Change_);
     els.cbSaveBtn.addEventListener('click', onSaveCreateBooking_);
 
-    els.bloodDrawingBtn.addEventListener('click', openBloodDrawingModal_);
-    els.bdCloseBtn.addEventListener('click', function () { hide_(els.bloodDrawingModalOverlay); });
+    els.bloodDrawingBtn.addEventListener('click', function () {
+      openFeaturePanel_(els.bloodDrawingModalOverlay, openBloodDrawingModal_, 'bloodDrawing');
+    });
+    els.bdCloseBtn.addEventListener('click', function () { returnFromFeaturePanel_(els.bloodDrawingModalOverlay); });
     els.bdBulkAddRowBtn.addEventListener('click', function () { addBulkBdRow_(); });
     els.bdBulkSaveBtn.addEventListener('click', onSaveBulkBd_);
     // taBdGridSubmitBtn is created dynamically inside renderTaBdGrid_ (the
@@ -213,47 +276,63 @@
     els.bdEditSaveBtn.addEventListener('click', onSaveEditBloodDrawing_);
     els.bdEditCancelBtn.addEventListener('click', function () { hide_(els.bdEditModalOverlay); });
 
-    els.taAvailabilityBtn.addEventListener('click', openTAAvailabilityModal_);
-    els.taAvailCloseBtn.addEventListener('click', function () { hide_(els.taAvailModalOverlay); });
+    els.taAvailabilityBtn.addEventListener('click', function () {
+      openFeaturePanel_(els.taAvailModalOverlay, openTAAvailabilityModal_, 'taAvailability');
+    });
+    els.taAvailCloseBtn.addEventListener('click', function () { returnFromFeaturePanel_(els.taAvailModalOverlay); });
     els.taAvailSaveBtn.addEventListener('click', onSaveTAAvailability_);
 
-    els.manageRolesBtn.addEventListener('click', openManageRolesModal_);
-    els.rolesCloseBtn.addEventListener('click', function () { hide_(els.manageRolesModalOverlay); });
+    els.manageRolesBtn.addEventListener('click', function () {
+      openFeaturePanel_(els.manageRolesModalOverlay, openManageRolesModal_, 'roles');
+    });
+    els.rolesCloseBtn.addEventListener('click', function () { returnFromFeaturePanel_(els.manageRolesModalOverlay); });
     els.createRoleBtn.addEventListener('click', onCreateRole_);
     els.createTaskBtn.addEventListener('click', onCreateTask_);
 
-    els.postExpBtn.addEventListener('click', openPostExpModal_);
-    els.postExpCloseBtn.addEventListener('click', function () { hide_(els.postExpModalOverlay); });
+    els.postExpBtn.addEventListener('click', function () {
+      openFeaturePanel_(els.postExpModalOverlay, openPostExpModal_, 'postExp');
+    });
+    els.postExpCloseBtn.addEventListener('click', function () { returnFromFeaturePanel_(els.postExpModalOverlay); });
 
-    els.combinationsBtn.addEventListener('click', openCombinationsModal_);
+    els.combinationsBtn.addEventListener('click', function () {
+      openFeaturePanel_(els.combinationsModalOverlay, openCombinationsModal_, 'combinations');
+    });
     els.addSchedTypeBtn.addEventListener('click', onAddSchedulingType_);
-    els.recordsBtn.addEventListener('click', openRecordsModal_);
-    els.emailTemplatesBtn.addEventListener('click', openEmailTemplatesModal_);
-    els.emailTemplatesCloseBtn.addEventListener('click', function () { hide_(els.emailTemplatesModalOverlay); });
+    els.recordsBtn.addEventListener('click', function () {
+      openFeaturePanel_(els.recordsModalOverlay, openRecordsModal_, 'records');
+    });
+    els.emailTemplatesBtn.addEventListener('click', function () {
+      openFeaturePanel_(els.emailTemplatesModalOverlay, openEmailTemplatesModal_, 'emailTemplates');
+    });
+    els.emailTemplatesCloseBtn.addEventListener('click', function () { returnFromFeaturePanel_(els.emailTemplatesModalOverlay); });
     els.etTemplateSelect.addEventListener('change', renderSelectedEmailTemplate_);
     els.etSaveBtn.addEventListener('click', onSaveEmailTemplate_);
     els.etResetBtn.addEventListener('click', onResetEmailTemplate_);
-    els.calendarInvitesBtn.addEventListener('click', openCalendarInvitesModal_);
-    els.calendarInvitesCloseBtn.addEventListener('click', function () { hide_(els.calendarInvitesModalOverlay); });
-    els.recordsCloseBtn.addEventListener('click', function () { hide_(els.recordsModalOverlay); });
+    els.calendarInvitesBtn.addEventListener('click', function () {
+      openFeaturePanel_(els.calendarInvitesModalOverlay, openCalendarInvitesModal_, 'calendarInvites');
+    });
+    els.calendarInvitesCloseBtn.addEventListener('click', function () { returnFromFeaturePanel_(els.calendarInvitesModalOverlay); });
+    els.recordsCloseBtn.addEventListener('click', function () { returnFromFeaturePanel_(els.recordsModalOverlay); });
     els.detailsModalCloseBtn.addEventListener('click', function () { hide_(els.detailsModalOverlay); });
     els.recordsRefreshBtn.addEventListener('click', loadRecords_);
     // Round 11: apply live instead of requiring a Load click after changing scope/type.
     els.recordsScopeSelect.addEventListener('change', loadRecords_);
     els.recordsSheetSelect.addEventListener('change', loadRecords_);
-    els.combinationsCloseBtn.addEventListener('click', function () { hide_(els.combinationsModalOverlay); });
+    els.combinationsCloseBtn.addEventListener('click', function () { returnFromFeaturePanel_(els.combinationsModalOverlay); });
     els.combinationsRefreshBtn.addEventListener('click', loadCombinations_);
     // Round 11: apply live instead of requiring a Preview click after changing scope.
     els.combinationsScope.addEventListener('change', loadCombinations_);
     els.combinationsPdfBtn.addEventListener('click', onExportCombinationsPdf_);
     els.combinationsFilter.addEventListener('input', renderCombinationsRows_);
 
-    els.bulkMriBtn.addEventListener('click', openBulkMriModal_);
+    els.bulkMriBtn.addEventListener('click', function () {
+      openFeaturePanel_(els.bulkMriModalOverlay, openBulkMriModal_, 'bulkMri');
+    });
     els.bulkMriAddRowBtn.addEventListener('click', function () { addBulkMriRow_(); });
     els.bulkMriValidateBtn.addEventListener('click', onValidateBulkMri_);
     els.bulkMriSaveBtn.addEventListener('click', onSaveBulkMri_);
     els.bulkMriPushBtn.addEventListener('click', onPushBulkMriToSchedule_);
-    els.bulkMriCloseBtn.addEventListener('click', function () { hide_(els.bulkMriModalOverlay); });
+    els.bulkMriCloseBtn.addEventListener('click', function () { returnFromFeaturePanel_(els.bulkMriModalOverlay); });
 
     // Round 12 fix: everything from cacheElements_() onward used to sit
     // OUTSIDE this callback (the closing '});' was here). Any top-level
@@ -282,6 +361,9 @@
       'fpOtp', 'fpOtpHint', 'fpNewPassword', 'fpConfirmPassword',
       'fpConfirmBtn', 'fpConfirmBtnText', 'fpConfirmSpinner', 'fpBackBtn2',
       'dashboard', 'sessionInfo', 'refreshBtn', 'changePwBtn', 'manageAdminsBtn', 'logoutBtn',
+      'adminSidebar', 'adminSidebarToggle', 'adminSidebarBackdrop', 'adminViewTitle',
+      'adminViewOverview', 'adminViewAssignments', 'overviewNavBtn', 'assignmentsNavBtn',
+      'assignmentsSearch', 'assignmentsTypeFilter', 'assignmentsEmptyMsg', 'assignmentsTable', 'assignmentsTableBody',
       'bookingsBtn', 'bookingsModalOverlay', 'bookingsModalError', 'bookingsModalSuccess',
       'bookingsLoading', 'bookingsEmptyMsg', 'bookingsTable', 'bookingsTableBody', 'bookingsCloseBtn',
       'bookingRescheduleModalOverlay', 'bookingRescheduleModalText', 'bookingRescheduleModalError',
@@ -371,6 +453,193 @@
 
   function can_(permission) {
     return !!(state.session && state.session.permissions && state.session.permissions.indexOf(permission) !== -1);
+  }
+
+  var ADMIN_PANEL_OVERLAYS_ = [
+    'bookingsModalOverlay', 'createBookingModalOverlay', 'bloodDrawingModalOverlay',
+    'taAvailModalOverlay', 'manageRolesModalOverlay', 'postExpModalOverlay',
+    'bulkMriModalOverlay', 'combinationsModalOverlay', 'recordsModalOverlay',
+    'emailTemplatesModalOverlay', 'calendarInvitesModalOverlay', 'adminsModalOverlay',
+    'pwModalOverlay'
+  ];
+
+  var ADMIN_VIEW_TITLES_ = {
+    overview: 'Sessions & Slots',
+    assignments: 'Assignments',
+    bookings: 'Bookings & Reschedule',
+    createBooking: 'Create Booking',
+    bloodDrawing: 'Blood Drawing',
+    taAvailability: 'TA Availability',
+    admins: 'Users & Admins',
+    roles: 'Roles & Permissions',
+    records: 'Records & History',
+    postExp: 'Post-Experiment',
+    combinations: 'Schedule Combinations',
+    bulkMri: 'Add MRI Slots',
+    emailTemplates: 'Email Templates',
+    calendarInvites: 'Calendar Invitations',
+    password: 'Change Password'
+  };
+
+  function setActiveNav_(view) {
+    document.querySelectorAll('.admin-nav-item').forEach(function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-admin-view') === view);
+    });
+    if (els.adminViewTitle) {
+      els.adminViewTitle.textContent = ADMIN_VIEW_TITLES_[view] || 'Admin';
+    }
+  }
+
+  function closeSidebarPanels_() {
+    ADMIN_PANEL_OVERLAYS_.forEach(function (id) {
+      var el = els[id];
+      if (!el) return;
+      el.classList.remove('as-panel');
+      hide_(el);
+    });
+  }
+
+  function showOverviewWorkspace_() {
+    closeSidebarPanels_();
+    if (els.adminViewAssignments) hide_(els.adminViewAssignments);
+    if (els.adminViewOverview) show_(els.adminViewOverview);
+    setActiveNav_('overview');
+  }
+
+  function openFeaturePanel_(overlayEl, openFn, viewKey) {
+    if (els.adminViewOverview) hide_(els.adminViewOverview);
+    if (els.adminViewAssignments) hide_(els.adminViewAssignments);
+    closeSidebarPanels_();
+    setActiveNav_(viewKey);
+    openFn();
+    if (overlayEl) overlayEl.classList.add('as-panel');
+    closeMobileSidebar_();
+  }
+
+  function returnFromFeaturePanel_(overlayEl) {
+    if (overlayEl) {
+      overlayEl.classList.remove('as-panel');
+      hide_(overlayEl);
+    }
+    showOverviewWorkspace_();
+  }
+
+  function closeMobileSidebar_() {
+    var workspace = document.querySelector('.admin-workspace');
+    if (workspace) workspace.classList.remove('sidebar-open');
+  }
+
+  function openMobileSidebar_() {
+    var workspace = document.querySelector('.admin-workspace');
+    if (workspace) workspace.classList.add('sidebar-open');
+  }
+
+  function showAssignmentsView_() {
+    closeSidebarPanels_();
+    if (els.adminViewOverview) hide_(els.adminViewOverview);
+    if (els.adminViewAssignments) show_(els.adminViewAssignments);
+    setActiveNav_('assignments');
+    renderAssignmentsTable_();
+    closeMobileSidebar_();
+  }
+
+  function renderAssignmentsTable_() {
+    if (!els.assignmentsTableBody) return;
+    var q = ((els.assignmentsSearch && els.assignmentsSearch.value) || '').trim().toLowerCase();
+    var typeFilter = (els.assignmentsTypeFilter && els.assignmentsTypeFilter.value) || '';
+    var rows = [];
+
+    (state.day1Slots || []).forEach(function (s) {
+      var staff = s.assignedStaffName || s.assignedStaffEmail || '';
+      if (!staff) return;
+      rows.push({
+        type: 'DAY1',
+        slotID: s.slotID,
+        date: s.date || '',
+        time: (s.startTime || s.start || '') + (s.endTime || s.end ? ' – ' + (s.endTime || s.end) : ''),
+        assigned: staff,
+        status: s.status || '',
+        slot: s,
+        kind: 'day1'
+      });
+    });
+    (state.day2Slots || []).forEach(function (s) {
+      var staff = s.assignedStaffName || s.assignedStaffEmail || '';
+      if (!staff) return;
+      rows.push({
+        type: 'DAY2',
+        slotID: s.slotID,
+        date: s.date || '',
+        time: (s.startTime || s.start || '') + (s.endTime || s.end ? ' – ' + (s.endTime || s.end) : ''),
+        assigned: staff,
+        status: s.status || '',
+        slot: s,
+        kind: 'day2'
+      });
+    });
+    (state.mriSlots || []).forEach(function (s) {
+      var staff = [s.day1StaffName, s.day2StaffName].filter(Boolean).join(' / ');
+      if (!staff) return;
+      rows.push({
+        type: 'MRI',
+        slotID: s.slotID,
+        date: s.date || '',
+        time: (s.startTime || s.start || '') + (s.duration ? ' (' + s.duration + ' min)' : ''),
+        assigned: staff,
+        status: s.status || '',
+        slot: s,
+        kind: 'mri'
+      });
+    });
+
+    rows = rows.filter(function (r) {
+      if (typeFilter && r.type !== typeFilter) return false;
+      if (!q) return true;
+      return (r.slotID + ' ' + r.date + ' ' + r.assigned + ' ' + r.type).toLowerCase().indexOf(q) !== -1;
+    });
+    rows.sort(function (a, b) {
+      return String(a.date).localeCompare(String(b.date)) || String(a.time).localeCompare(String(b.time));
+    });
+
+    els.assignmentsTableBody.innerHTML = '';
+    if (!rows.length) {
+      show_(els.assignmentsEmptyMsg);
+      return;
+    }
+    hide_(els.assignmentsEmptyMsg);
+    rows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + escapeHtml_(r.type) + '</td>' +
+        '<td>' + escapeHtml_(r.slotID) + '</td>' +
+        '<td>' + escapeHtml_(r.date) + '</td>' +
+        '<td>' + escapeHtml_(r.time) + '</td>' +
+        '<td>' + escapeHtml_(r.assigned) + '</td>' +
+        '<td><span class="status-pill">' + escapeHtml_(r.status || '—') + '</span></td>' +
+        '<td></td>';
+      var td = tr.lastElementChild;
+      if (r.kind === 'day1' || r.kind === 'day2') {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-secondary btn-small';
+        btn.textContent = 'Edit';
+        btn.addEventListener('click', function () {
+          openEditScheduleModal_(r.slot, r.kind);
+        });
+        td.appendChild(btn);
+      } else {
+        td.textContent = '—';
+      }
+      els.assignmentsTableBody.appendChild(tr);
+    });
+  }
+
+  function escapeHtml_(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   /** Shows/hides whole panels and controls that require 'manage_slots'. */
@@ -674,7 +943,9 @@
   function anyModalOpen_() {
     var overlays = document.querySelectorAll('.modal-overlay');
     for (var i = 0; i < overlays.length; i++) {
-      if (!overlays[i].classList.contains('hidden')) return true;
+      var el = overlays[i];
+      if (el.classList.contains('as-panel')) continue; // sidebar feature panels are fine to refresh under
+      if (!el.classList.contains('hidden')) return true;
     }
     return false;
   }
@@ -701,6 +972,9 @@
         refreshDay1TableView_();
         refreshDay2TableView_();
         refreshMriTableView_();
+        if (els.adminViewAssignments && !els.adminViewAssignments.classList.contains('hidden')) {
+          renderAssignmentsTable_();
+        }
       })
       .withFailureHandler(function (err) {
         // Silent by design — a background refresh failing shouldn't
@@ -724,6 +998,9 @@
         refreshDay1TableView_();
         refreshDay2TableView_();
         refreshMriTableView_();
+        if (els.adminViewAssignments && !els.adminViewAssignments.classList.contains('hidden')) {
+          renderAssignmentsTable_();
+        }
       })
       .withFailureHandler(function (err) {
         [els.day1OverviewLoading, els.day2OverviewLoading, els.mriOverviewLoading].forEach(hide_);

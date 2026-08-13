@@ -119,13 +119,30 @@
       var url = '/?view=' + view;
       history[options.replace ? 'replaceState' : 'pushState']({ view: view }, '', url);
     }
-    if (frame.getAttribute('data-view') !== view) {
-      frame.setAttribute('data-view', view);
+    var needsReload = frame.getAttribute('data-view') !== view;
+    frame.setAttribute('data-view', view);
+    if (needsReload) {
       frame.src = VIEWS[view];
+    } else if (view === 'admin') {
+      pushSessionIntoFrame_();
     }
     topnav.classList.remove('open');
     document.getElementById('navToggle').setAttribute('aria-expanded', 'false');
   }
+
+  function pushSessionIntoFrame_() {
+    var session = getSession();
+    if (!session || !session.token) return;
+    try {
+      frame.contentWindow.postMessage({ type: 'es-admin-session', session: session }, '*');
+    } catch (e) { /* ignore */ }
+  }
+
+  frame.addEventListener('load', function () {
+    if (frame.getAttribute('data-view') === 'admin') {
+      pushSessionIntoFrame_();
+    }
+  });
 
   function openLogin() {
     loginError.classList.add('hidden');
@@ -217,6 +234,7 @@
 
   window.addEventListener('message', function (evt) {
     var data = evt.data || {};
+    // Ignore login requests from the iframe — navbar login is the only prompt.
     if (data.type === 'es-admin-session' && data.session && data.session.token) {
       saveSession(data.session);
       updateAuthUI();
@@ -225,9 +243,6 @@
       clearSession();
       updateAuthUI();
       navigate('book');
-    }
-    if (data.type === 'es-request-login') {
-      openLogin();
     }
     if (data.type === 'es-project-id' && data.projectId) {
       var banner = document.getElementById('shellProjectBanner');
