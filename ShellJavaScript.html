@@ -124,7 +124,7 @@
     if (needsReload) {
       frame.src = VIEWS[view];
     } else if (view === 'admin') {
-      pushSessionIntoFrame_();
+      pushSessionIntoFrameSoon_();
     }
     topnav.classList.remove('open');
     document.getElementById('navToggle').setAttribute('aria-expanded', 'false');
@@ -138,9 +138,16 @@
     } catch (e) { /* ignore */ }
   }
 
+  function pushSessionIntoFrameSoon_() {
+    pushSessionIntoFrame_();
+    setTimeout(pushSessionIntoFrame_, 50);
+    setTimeout(pushSessionIntoFrame_, 250);
+    setTimeout(pushSessionIntoFrame_, 800);
+  }
+
   frame.addEventListener('load', function () {
     if (frame.getAttribute('data-view') === 'admin') {
-      pushSessionIntoFrame_();
+      pushSessionIntoFrameSoon_();
     }
   });
 
@@ -235,6 +242,9 @@
   window.addEventListener('message', function (evt) {
     var data = evt.data || {};
     // Ignore login requests from the iframe — navbar login is the only prompt.
+    if (data.type === 'es-request-session') {
+      pushSessionIntoFrameSoon_();
+    }
     if (data.type === 'es-admin-session' && data.session && data.session.token) {
       saveSession(data.session);
       updateAuthUI();

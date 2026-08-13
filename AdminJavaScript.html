@@ -53,6 +53,8 @@
   var ADMIN_SESSION_KEY_ = 'es_admin_session';
   var pendingShellSession_ = null;
   var adminUiReady_ = false;
+  var adminSessionHandler_ = null;
+  var adminLogoutHandler_ = null;
 
   function isEmbedded_() {
     try {
@@ -88,72 +90,75 @@
     } catch (e2) { /* ignore */ }
   }
 
-  function restoreShellSession_() {
-    try {
-      var raw = sessionStorage.getItem(ADMIN_SESSION_KEY_);
-      if (!raw) return;
-      var saved = JSON.parse(raw);
-      if (!saved || !saved.token) return;
-      applyExternalSession_(saved);
-    } catch (e) { /* ignore */ }
-  }
-
+  // Buffer shell messages until DOMContentLoaded wires the real handlers.
+  // (Most admin helpers live inside that callback and are not visible here.)
   window.addEventListener('message', function (evt) {
     var data = evt.data || {};
     if (data.type === 'es-admin-session' && data.session && data.session.token) {
-      if (!adminUiReady_) {
-        pendingShellSession_ = data.session;
-        return;
-      }
-      applyExternalSession_(data.session);
+      pendingShellSession_ = data.session;
+      if (adminSessionHandler_) adminSessionHandler_(data.session);
     }
     if (data.type === 'es-admin-logout') {
-      stopAutoRefresh_();
-      state.token = null;
-      state.session = null;
       pendingShellSession_ = null;
-      if (adminUiReady_) {
-        hide_(els.dashboard);
-        if (!isEmbedded_()) show_(els.loginSection);
-      }
+      if (adminLogoutHandler_) adminLogoutHandler_();
     }
   });
-
-  function applyExternalSession_(saved) {
-    if (!saved || !saved.token) return;
-    if (!adminUiReady_) {
-      pendingShellSession_ = saved;
-      return;
-    }
-    var wasLoggedIn = !!state.token;
-    state.token = saved.token;
-    state.session = {
-      email: saved.email,
-      name: saved.name,
-      role: saved.role,
-      permissions: saved.permissions || []
-    };
-    try { sessionStorage.setItem(ADMIN_SESSION_KEY_, JSON.stringify(saved)); } catch (e) { /* ignore */ }
-    if (els.sessionInfo) {
-      els.sessionInfo.textContent = state.session.name + ' — ' + state.session.role;
-    }
-    hide_(els.loginSection);
-    show_(els.dashboard);
-    applyPermissionVisibility_();
-    if (!wasLoggedIn) {
-      loadStaffOptions_();
-      loadOverview_();
-      startAutoRefresh_();
-    }
-  }
 
   document.addEventListener('DOMContentLoaded', function () {
     cacheElements_();
     adminUiReady_ = true;
+
+    function restoreShellSession_() {
+      try {
+        var raw = sessionStorage.getItem(ADMIN_SESSION_KEY_);
+        if (!raw) return;
+        var saved = JSON.parse(raw);
+        if (!saved || !saved.token) return;
+        applyExternalSession_(saved);
+      } catch (e) { /* ignore */ }
+    }
+
+    function applyExternalSession_(saved) {
+      if (!saved || !saved.token) return;
+      var wasLoggedIn = !!state.token;
+      state.token = saved.token;
+      state.session = {
+        email: saved.email,
+        name: saved.name,
+        role: saved.role,
+        permissions: saved.permissions || []
+      };
+      try { sessionStorage.setItem(ADMIN_SESSION_KEY_, JSON.stringify(saved)); } catch (e) { /* ignore */ }
+      if (els.sessionInfo) {
+        els.sessionInfo.textContent = state.session.name + ' — ' + state.session.role;
+      }
+      hide_(els.loginSection);
+      show_(els.dashboard);
+      applyPermissionVisibility_();
+      if (!wasLoggedIn) {
+        loadStaffOptions_();
+        loadOverview_();
+        startAutoRefresh_();
+      }
+    }
+
+    function handleShellLogout_() {
+      stopAutoRefresh_();
+      state.token = null;
+      state.session = null;
+      pendingShellSession_ = null;
+      hide_(els.dashboard);
+      if (!isEmbedded_()) show_(els.loginSection);
+    }
+
+    adminSessionHandler_ = applyExternalSession_;
+    adminLogoutHandler_ = handleShellLogout_;
+
     if (isEmbedded_()) {
       // Parent shell owns login — hide the duplicate admin login panel.
       hide_(els.loginSection);
       document.body.classList.add('embed-admin');
+      try { parent.postMessage({ type: 'es-request-session' }, '*'); } catch (e) { /* ignore */ }
     }
     if (pendingShellSession_) {
       applyExternalSession_(pendingShellSession_);
