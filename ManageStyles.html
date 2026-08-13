@@ -1,20 +1,21 @@
 <style>
+  /* Manage appointment — extends participant Styles.html */
   .details-box {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 14px 16px;
+    background: linear-gradient(180deg, rgba(20, 122, 128, 0.07), transparent);
+    border: 1px solid rgba(12, 46, 54, 0.12);
+    border-radius: 14px;
+    padding: 16px 18px;
     margin: 12px 0;
     font-size: 14px;
     line-height: 1.7;
   }
 
-  .details-box .row-label { font-weight: 600; }
+  .details-box .row-label { font-weight: 650; color: #0c2e36; }
 
   .subsection {
     margin-top: 22px;
     padding-top: 18px;
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid rgba(12, 46, 54, 0.12);
   }
 
   .action-buttons {
@@ -26,8 +27,19 @@
 
   .action-buttons .btn { flex: 1 1 200px; }
 
-  .btn-danger { background: #dc2626; color: #fff; }
-  .btn-danger:hover:not(:disabled) { background: #b91c1c; }
+  .btn-danger {
+    background: linear-gradient(135deg, #c0392b, #a93226);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(192, 57, 43, 0.22);
+  }
+  .btn-danger:hover:not(:disabled) { filter: brightness(1.05); }
+
+  .btn-secondary {
+    background: #fff;
+    color: #0c2e36;
+    border: 1px solid rgba(12, 46, 54, 0.14);
+    width: 100%;
+  }
 
   .inline-row { display: flex; gap: 8px; align-items: center; }
   .inline-row input[type="date"] { flex: 1; }
@@ -35,21 +47,36 @@
   .avail-list { list-style: none; padding: 0; margin: 10px 0; }
   .avail-list li {
     display: flex; justify-content: space-between; align-items: center;
-    background: #f1f5f9; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px;
+    background: rgba(20, 122, 128, 0.07);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
     font-size: 14px;
   }
   .avail-list button {
-    background: none; border: none; color: #dc2626; cursor: pointer;
+    background: none; border: none; color: #b42318; cursor: pointer;
     font-size: 18px; line-height: 1;
   }
 
   .contact-box {
-    margin-top: 18px; padding: 12px 16px;
-    background: #f8fafc; border-radius: 10px; font-size: 14px;
+    margin-top: 18px;
+    padding: 14px 16px;
+    background: rgba(20, 122, 128, 0.06);
+    border: 1px solid rgba(12, 46, 54, 0.1);
+    border-radius: 14px;
+    font-size: 14px;
   }
 
-  .lang-buttons { display: flex; gap: 10px; }
-  .lang-buttons .btn { flex: 1; }
+  .lang-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+  .lang-buttons .btn { flex: 1 1 140px; }
 
-  .hint { font-size: 13.5px; color: #64748b; margin-bottom: 12px; }
+  .hint {
+    font-size: 13.5px;
+    color: #3d5c64;
+    margin-bottom: 12px;
+  }
+
+  @media (max-width: 520px) {
+    .action-buttons .btn { flex: 1 1 100%; }
+  }
 </style>

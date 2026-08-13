@@ -1,24 +1,44 @@
 <style>
   /* ==========================================================================
-     AdminStyles.html — Visual design for the Admin portal
+     AdminStyles.html — Admin portal UI
      ========================================================================== */
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Outfit:wght@400;500;600;700&display=swap');
 
   :root {
-    --color-primary: #4f46e5;
-    --color-primary-dark: #4338ca;
-    --color-bg: #f5f6fa;
+    --ink: #0c2e36;
+    --ink-soft: #3d5c64;
+    --teal: #147a80;
+    --teal-deep: #0d5c61;
+    --teal-glow: rgba(20, 122, 128, 0.18);
+    --accent: #c97820;
+    --surface: rgba(255, 255, 255, 0.9);
+    --border: rgba(12, 46, 54, 0.12);
+    --success-bg: #e8f8f0;
+    --success-text: #0f6b45;
+    --error-bg: #fff0f0;
+    --error-text: #b42318;
+    --warn-bg: #fff7eb;
+    --warn-text: #8a5310;
+    --radius: 16px;
+    --radius-sm: 10px;
+    --shadow: 0 10px 30px rgba(12, 46, 54, 0.08);
+    --font-display: 'Fraunces', Georgia, serif;
+    --font-body: 'Outfit', system-ui, sans-serif;
+
+    --color-primary: var(--teal);
+    --color-primary-dark: var(--teal-deep);
+    --color-bg: #eef6f7;
     --color-card: #ffffff;
-    --color-border: #e2e4ea;
-    --color-text: #1f2330;
-    --color-text-muted: #6b7280;
-    --color-success-bg: #ecfdf5;
-    --color-success-text: #047857;
-    --color-error-bg: #fef2f2;
-    --color-error-text: #b91c1c;
-    --color-warn-bg: #fffbeb;
-    --color-warn-text: #92400e;
-    --radius: 10px;
-    --shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --color-border: var(--border);
+    --color-text: var(--ink);
+    --color-text-muted: var(--ink-soft);
+    --color-success-bg: var(--success-bg);
+    --color-success-text: var(--success-text);
+    --color-error-bg: var(--error-bg);
+    --color-error-text: var(--error-text);
+    --color-warn-bg: var(--warn-bg);
+    --color-warn-text: var(--warn-text);
+    --color-navy: #0c2e36;
   }
 
   * { box-sizing: border-box; }
@@ -26,347 +46,302 @@
   html, body {
     margin: 0;
     padding: 0;
-    background: var(--color-bg);
-    color: var(--color-text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    color: var(--ink);
+    font-family: var(--font-body);
     line-height: 1.5;
+    background:
+      radial-gradient(1000px 520px at 0% -5%, rgba(20, 122, 128, 0.18), transparent 55%),
+      radial-gradient(800px 420px at 100% 0%, rgba(201, 120, 32, 0.10), transparent 50%),
+      linear-gradient(180deg, #f3fafa 0%, #eef5f6 100%);
+    background-attachment: fixed;
   }
 
   .admin-container {
-    max-width: 880px;
+    max-width: 1080px;
     margin: 0 auto;
-    padding: 32px 20px 64px;
+    padding: clamp(20px, 3vw, 36px) clamp(14px, 2.5vw, 22px) 72px;
+    animation: riseIn 0.45s ease both;
+  }
+
+  @keyframes riseIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   .admin-header {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 22px;
   }
 
   .admin-header h1 {
-    font-size: 24px;
-    margin: 0 0 4px;
+    font-family: var(--font-display);
+    font-size: clamp(1.6rem, 3.5vw, 2.1rem);
+    margin: 0 0 6px;
+    letter-spacing: -0.02em;
   }
 
   .subtitle {
-    color: var(--color-text-muted);
+    color: var(--ink-soft);
     margin: 0;
     font-size: 14px;
   }
 
-  /* Round 10: Project ID — sits above everything (all portals), and the
-     Main-Admin-only inline edit control under the Admin Portal header. */
+  .brand-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    color: var(--teal-deep);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .brand-mark::before {
+    content: '';
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--teal), var(--teal-deep));
+    box-shadow: 0 8px 16px var(--teal-glow);
+  }
+
   .project-id-banner {
-    background: var(--color-navy, #1F3A5F);
+    background: linear-gradient(90deg, #0c2e36, #147a80);
     color: #fff;
     text-align: center;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
-    letter-spacing: 0.02em;
-    padding: 6px 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px 12px;
   }
   .project-id-control {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    margin-top: 10px;
+    margin-top: 12px;
     font-size: 13px;
+    flex-wrap: wrap;
   }
   .project-id-control label {
-    color: var(--color-text-muted);
+    color: var(--ink-soft);
     font-weight: 600;
   }
   .project-id-control input {
-    width: 240px;
-    padding: 4px 8px;
+    width: min(240px, 70vw);
+    padding: 8px 10px;
   }
 
   .owner-banner {
-    background: #f8f9fc;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
     padding: 10px 14px;
     font-size: 12.5px;
-    color: var(--color-text-muted);
+    color: var(--ink-soft);
     margin-bottom: 16px;
     text-align: center;
+    backdrop-filter: blur(8px);
   }
 
   .hidden { display: none !important; }
 
-  /* ---------------- Banner ---------------- */
-
   .banner {
     padding: 12px 16px;
-    border-radius: var(--radius);
+    border-radius: var(--radius-sm);
     margin-bottom: 18px;
     font-size: 14px;
     font-weight: 500;
   }
-
   .banner-error {
-    background: var(--color-error-bg);
-    color: var(--color-error-text);
-    border: 1px solid #fecaca;
+    background: var(--error-bg);
+    color: var(--error-text);
+    border: 1px solid #f5c2c0;
   }
-
   .banner-success {
-    background: var(--color-success-bg);
-    color: var(--color-success-text);
-    border: 1px solid #a7f3d0;
+    background: var(--success-bg);
+    color: var(--success-text);
+    border: 1px solid #b7e4cb;
   }
 
-  /* ---------------- Concise notifications ---------------- */
-  .concise-title {
-    font-weight: 700;
-    margin-bottom: 4px;
-  }
-  .concise-lines {
-    list-style: none;
-    margin: 0 0 6px;
-    padding: 0;
-    font-weight: 400;
-  }
+  .concise-title { font-weight: 700; margin-bottom: 4px; }
+  .concise-lines { margin: 0; padding-left: 18px; }
   .concise-lines li { margin: 1px 0; }
   .concise-details-btn {
+    margin-top: 8px;
     background: none;
     border: none;
-    padding: 0;
-    font: inherit;
-    font-weight: 600;
-    text-decoration: underline;
+    color: var(--teal-deep);
+    font-weight: 650;
     cursor: pointer;
-    color: inherit;
-  }
-  .details-modal-body {
-    white-space: pre-line;
-    max-height: 60vh;
-    overflow-y: auto;
-    font-size: 13.5px;
-    line-height: 1.5;
+    font-family: inherit;
+    padding: 0;
   }
 
-  /* ---------------- Panels ---------------- */
+  .details-modal-body {
+    font-size: 14px;
+    line-height: 1.6;
+    max-height: 50vh;
+    overflow: auto;
+  }
 
   .panel {
-    background: var(--color-card);
-    border: 1px solid var(--color-border);
+    background: var(--surface);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 22px;
-    margin-bottom: 20px;
+    padding: clamp(16px, 2.5vw, 24px);
+    margin-bottom: 18px;
     box-shadow: var(--shadow);
   }
 
   .panel h2, .panel h3 {
-    margin: 0 0 6px;
+    font-family: var(--font-display);
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
   }
-
   .panel h3 { font-size: 16px; }
 
   .panel-subtitle {
-    font-weight: 400;
-    color: var(--color-text-muted);
+    color: var(--ink-soft);
     font-size: 13px;
+    margin: 0 0 14px;
   }
 
   .hint {
-    color: var(--color-text-muted);
+    color: var(--ink-soft);
     font-size: 13px;
-    margin: 0 0 16px;
+    margin: 0 0 12px;
   }
 
   .dashboard-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
     flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 16px;
   }
 
   .dashboard-header h2 {
+    font-family: var(--font-display);
     margin: 0;
-    font-size: 19px;
+    font-size: 1.35rem;
   }
 
   .dashboard-actions {
     display: flex;
-    gap: 8px;
     flex-wrap: wrap;
+    gap: 8px;
   }
 
   .loading, .empty-message {
-    color: var(--color-text-muted);
-    font-size: 13.5px;
+    color: var(--ink-soft);
+    font-size: 14px;
     padding: 10px 0;
   }
 
   .empty-message {
-    background: var(--color-warn-bg);
-    border: 1px solid #fde68a;
-    color: var(--color-warn-text);
-    border-radius: var(--radius);
-    padding: 10px 14px;
+    background: var(--warn-bg);
+    border: 1px solid #f0d4a8;
+    color: var(--warn-text);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
   }
 
-  /* ---------------- Slot table ---------------- */
-
-  /* Long tables scroll horizontally within their own container instead of
-     overflowing the panel/modal (spec round 2, #14). */
   .table-scroll {
     width: 100%;
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: #fff;
   }
 
   .slot-table {
     width: 100%;
-    min-width: 520px;
     border-collapse: collapse;
     font-size: 13.5px;
+    min-width: 640px;
   }
 
   .slot-table th, .slot-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
     text-align: left;
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--color-border);
+    vertical-align: middle;
   }
 
   .slot-table th {
-    color: var(--color-text-muted);
-    font-weight: 600;
+    background: rgba(20, 122, 128, 0.06);
     font-size: 12px;
     text-transform: uppercase;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    font-weight: 700;
   }
 
   .status-pill {
     display: inline-block;
-    padding: 2px 10px;
+    padding: 3px 10px;
     border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-  }
-
-  /* ---------------- TA Blood Drawing availability grid ("poll" layout) ---------------- */
-
-  .ta-grid-nav {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 6px;
-  }
-
-  .ta-grid-scroll {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-  }
-
-  .ta-grid-table {
-    border-collapse: collapse;
-    font-size: 13px;
-    min-width: 100%;
-  }
-
-  .ta-grid-table th, .ta-grid-table td {
-    border: 1px solid var(--color-border);
-    padding: 6px 10px;
-    text-align: center;
-    white-space: nowrap;
-  }
-
-  .ta-grid-table thead th {
-    background: #ececec;
+    font-size: 11.5px;
     font-weight: 700;
-    font-size: 12.5px;
+    letter-spacing: 0.02em;
   }
 
+  .status-available {
+    background: var(--success-bg);
+    color: var(--success-text);
+  }
+  .status-booked {
+    background: #e8eef8;
+    color: #274c77;
+  }
+
+  .ta-grid-nav { display: flex; gap: 8px; margin-bottom: 10px; }
+  .ta-grid-scroll { overflow: auto; max-width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; }
+  .ta-grid-table { border-collapse: collapse; font-size: 12.5px; }
+  .ta-grid-table th, .ta-grid-table td {
+    border: 1px solid var(--border);
+    padding: 6px 8px;
+    text-align: center;
+  }
+  .ta-grid-table thead th { background: rgba(20, 122, 128, 0.06); }
   .ta-grid-table .ta-grid-corner,
   .ta-grid-table .ta-grid-name-cell,
   .ta-grid-table .ta-grid-row-label {
     position: sticky;
     left: 0;
-    z-index: 2;
-    text-align: left;
     background: #fff;
-    min-width: 160px;
+    z-index: 1;
+    text-align: left;
   }
-
-  .ta-grid-table thead .ta-grid-corner {
-    background: #ececec;
-    z-index: 3;
-  }
-
+  .ta-grid-table thead .ta-grid-corner { z-index: 2; }
   .ta-grid-table .ta-grid-name-input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 6px 8px;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
+    width: 140px;
+    padding: 4px 6px;
+    font-size: 12px;
   }
-
-  .ta-grid-table .ta-grid-checkbox-cell input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-  }
-
-  .ta-grid-table .ta-grid-submit-cell {
-    background: #f7f7f7;
-  }
-
-  .ta-grid-spacer-row td {
-    border: none;
-    padding: 4px 0;
-    background: transparent;
-  }
-
-  .ta-grid-table .ta-grid-available {
-    background: var(--color-success-bg);
-    color: var(--color-success-text);
-    font-weight: 700;
-  }
-
-  .ta-grid-table .ta-grid-unavailable {
-    background: var(--color-error-bg);
-    color: var(--color-error-text);
-    font-weight: 700;
-  }
-
-  .ta-grid-table .ta-grid-me-row .ta-grid-name-cell {
-    font-weight: 700;
-  }
-
-  .ta-grid-table tfoot td {
-    background: var(--color-success-bg);
-    font-weight: 700;
-  }
-
-  .status-available {
-    background: var(--color-success-bg);
-    color: var(--color-success-text);
-  }
-
-  .status-booked {
-    background: #f3f4f6;
-    color: var(--color-text-muted);
-  }
-
-  /* ---------------- Forms ---------------- */
+  .ta-grid-table .ta-grid-checkbox-cell input[type="checkbox"] { width: auto; }
+  .ta-grid-table .ta-grid-submit-cell { white-space: nowrap; }
+  .ta-grid-spacer-row td { background: #f7fafb; height: 8px; border: none; }
+  .ta-grid-table .ta-grid-available { background: #e8f8f0; }
+  .ta-grid-table .ta-grid-unavailable { background: #fff0f0; }
+  .ta-grid-table .ta-grid-me-row .ta-grid-name-cell { font-weight: 700; }
+  .ta-grid-table tfoot td { background: rgba(20, 122, 128, 0.04); font-weight: 650; }
 
   .subform {
-    margin-bottom: 18px;
-    padding-bottom: 4px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
   }
-
   .subform h4 {
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    color: var(--color-text-muted);
     margin: 0 0 10px;
+    font-size: 14px;
+    font-family: var(--font-display);
   }
 
   .form-row {
@@ -376,31 +351,26 @@
   }
 
   .filter-toolbar {
-    background: var(--color-surface-alt, #f7f7f9);
-    border: 1px solid var(--color-border, #e0e0e5);
-    border-radius: 8px;
-    padding: 10px 14px 0;
-    margin-bottom: 14px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+    padding: 12px;
+    background: rgba(20, 122, 128, 0.04);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
   }
-  .filter-toolbar .form-group { margin-bottom: 10px; }
+  .filter-toolbar .form-group { margin-bottom: 0; }
   .filter-toolbar label { font-size: 12px; }
 
-  .form-group {
-    margin-bottom: 14px;
-    min-width: 0; /* lets long select/input values shrink instead of forcing overflow */
-  }
-
-  .form-group input, .form-group select, .form-group textarea {
-    width: 100%;
-    box-sizing: border-box;
-  }
+  .form-group { margin-bottom: 14px; }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; }
 
   label {
     display: block;
     font-size: 12.5px;
-    font-weight: 600;
-    margin-bottom: 5px;
-    color: var(--color-text);
+    font-weight: 650;
+    margin-bottom: 6px;
   }
 
   input[type="text"],
@@ -408,21 +378,23 @@
   input[type="time"],
   input[type="number"],
   input[type="password"],
-  select {
+  input[type="email"],
+  select,
+  textarea {
     width: 100%;
-    padding: 9px 11px;
-    border: 1.5px solid var(--color-border);
-    border-radius: 8px;
-    font-size: 13.5px;
+    padding: 10px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
     font-family: inherit;
     background: #fff;
-    color: var(--color-text);
+    color: var(--ink);
   }
 
-  input:focus, select:focus {
+  input:focus, select:focus, textarea:focus {
     outline: none;
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+    border-color: var(--teal);
+    box-shadow: 0 0 0 4px var(--teal-glow);
   }
 
   .btn {
@@ -431,203 +403,128 @@
     justify-content: center;
     gap: 8px;
     border: none;
-    border-radius: 8px;
-    padding: 10px 18px;
+    border-radius: 999px;
+    padding: 10px 16px;
     font-size: 13.5px;
-    font-weight: 600;
+    font-weight: 650;
     cursor: pointer;
     font-family: inherit;
-    transition: background 0.15s ease, opacity 0.15s ease;
+    transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
   }
 
   .btn-primary {
-    background: var(--color-primary);
+    background: linear-gradient(135deg, var(--teal), var(--teal-deep));
     color: #fff;
-    width: 100%;
+    box-shadow: 0 8px 20px var(--teal-glow);
   }
-
   .btn-primary:hover:not(:disabled) {
-    background: var(--color-primary-dark);
+    transform: translateY(-1px);
   }
 
   .btn-secondary {
-    background: #f3f4f6;
-    color: var(--color-text);
+    background: #fff;
+    color: var(--ink);
+    border: 1px solid var(--border);
   }
-
-  .btn-secondary:hover {
-    background: #e5e7eb;
-  }
+  .btn-secondary:hover { border-color: var(--teal); }
 
   .btn-link {
     background: none;
-    color: var(--color-primary);
-    padding: 6px 0;
-  }
-
-  .btn-link:hover {
+    color: var(--teal-deep);
+    padding: 4px 6px;
     text-decoration: underline;
   }
+  .btn-link:hover { color: var(--teal); }
 
   .btn-danger {
-    background: #dc2626;
+    background: #c0392b;
+    color: #fff;
   }
+  .btn-danger:hover:not(:disabled) { background: #a93226; }
 
-  .btn-danger:hover:not(:disabled) {
-    background: #b91c1c;
-  }
-
-  .btn-sm {
-    padding: 5px 10px;
-    font-size: 12px;
-    width: auto;
-  }
-
-  .row-actions-cell {
-    white-space: nowrap;
-  }
-
-  .slot-table select {
-    padding: 5px 7px;
+  .btn-sm, .btn-small {
+    padding: 5px 12px;
     font-size: 12.5px;
-    min-width: 140px;
+    margin-right: 6px;
   }
+
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+  .row-actions-cell { white-space: nowrap; }
+  .slot-table select { min-width: 120px; width: auto; }
 
   .day2-checkbox-item {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
     padding: 8px 10px;
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--border);
     border-radius: 8px;
     margin-bottom: 6px;
-    font-size: 13px;
-    background: #fafafa;
+    background: #fff;
   }
-
-  .day2-checkbox-item input[type="checkbox"] {
-    width: auto;
-  }
+  .day2-checkbox-item input[type="checkbox"] { width: auto; margin-top: 3px; }
 
   .tag-warn {
-    background: #fef3c7;
-    color: #92400e;
+    background: var(--warn-bg);
+    color: var(--warn-text);
   }
 
   .warning-box {
-    background: #fffbeb;
-    border: 1px solid #fde68a;
-    border-radius: 8px;
-    padding: 10px 14px;
+    background: var(--warn-bg);
+    border: 1px solid #f0d4a8;
+    color: var(--warn-text);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    font-size: 13.5px;
     margin: 10px 0;
-    font-size: 13px;
-    color: #92400e;
   }
-
-  .warning-box ul {
-    margin: 6px 0;
-    padding-left: 20px;
-  }
-
+  .warning-box ul { margin: 6px 0 0; padding-left: 18px; }
   .warning-box li { margin-bottom: 3px; }
 
   .day2-staff-row {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    margin-bottom: 6px;
-    font-size: 13px;
-    background: #fafafa;
     flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 0;
   }
-
   .day2-staff-row select { min-width: 190px; width: auto; }
   .day2-staff-row input[type="checkbox"] { width: auto; }
   .day2-staff-row .slot-label { flex: 1 1 240px; }
 
   .compatible-box {
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    border-radius: 8px;
-    padding: 10px 14px;
+    background: rgba(20, 122, 128, 0.06);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
     margin: 10px 0;
-    font-size: 13px;
   }
-
-  .compatible-box ul {
-    margin: 6px 0 0;
-    padding-left: 20px;
-  }
-
-  .compatible-box li {
-    margin-bottom: 3px;
-  }
-
-  #deleteDay1OrphanList {
-    margin: 10px 0;
-    padding-left: 20px;
-    font-size: 13px;
-  }
-
-  #deleteDay1OrphanList li {
-    margin-bottom: 4px;
-  }
-
-  .btn:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-  }
+  .compatible-box ul { margin: 6px 0 0; padding-left: 18px; }
+  .compatible-box li { margin-bottom: 4px; }
 
   .spinner {
-    width: 13px;
-    height: 13px;
-    border: 2px solid rgba(255, 255, 255, 0.5);
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.45);
     border-top-color: #fff;
     border-radius: 50%;
     display: inline-block;
     animation: spin 0.7s linear infinite;
   }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-
-  /* ---------------- Day 2 rows (in Add Day 1 form) ---------------- */
-
-  /* Round 3, #5: this row used to be a rigid `1fr 1fr 1fr auto auto` grid.
-     Inside the width-capped scheduling dialog the `1fr` tracks could not
-     shrink below their inputs' intrinsic width (grid items default to
-     min-width:auto), so the trailing `auto` columns pushed the Day 2 time
-     controls outside the visible panel. An auto-fit grid plus explicit
-     min-width:0 lets every control shrink and wrap instead of clipping. */
   .day2-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) auto;
     gap: 10px;
     align-items: end;
-    margin-bottom: 12px;
-    padding: 12px;
-    background: #fafafa;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    margin-bottom: 10px;
   }
-
   .day2-row > * { min-width: 0; }
-
-  .day2-row .form-group {
-    margin-bottom: 0;
-    min-width: 0;
-  }
-
+  .day2-row .form-group { margin-bottom: 0; }
   .day2-row input,
-  .day2-row select {
-    width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
-  }
+  .day2-row select { width: 100%; }
 
   .tag {
     display: inline-block;
@@ -639,26 +536,14 @@
     align-self: end;
     margin-bottom: 1px;
   }
-
-  .tag-ok {
-    background: var(--color-success-bg);
-    color: var(--color-success-text);
-  }
-
-  .tag-bad {
-    background: var(--color-error-bg);
-    color: var(--color-error-text);
-  }
-
-  .tag-pending {
-    background: #f3f4f6;
-    color: var(--color-text-muted);
-  }
+  .tag-ok { background: var(--success-bg); color: var(--success-text); }
+  .tag-bad { background: var(--error-bg); color: var(--error-text); }
+  .tag-pending { background: #eef2f3; color: var(--ink-soft); }
 
   .row-remove-btn {
     background: none;
     border: none;
-    color: var(--color-error-text);
+    color: var(--error-text);
     cursor: pointer;
     font-size: 18px;
     line-height: 1;
@@ -666,21 +551,18 @@
     align-self: end;
   }
 
-  /* ---------------- Modal ---------------- */
-  /* Dynamic panels (spec round 2, #14): every modal sizes itself to its
-     content, shrinks to fit small viewports, and scrolls internally
-     rather than letting content overflow outside the visible panel. */
-
   .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(15, 17, 26, 0.45);
+    background: rgba(12, 46, 54, 0.48);
+    backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 20px;
     z-index: 50;
     box-sizing: border-box;
+    animation: riseIn 0.2s ease both;
   }
 
   .modal {
@@ -692,63 +574,49 @@
     max-height: calc(100vh - 40px);
     overflow-y: auto;
     box-sizing: border-box;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 24px 60px rgba(12, 46, 54, 0.28);
+    border: 1px solid var(--border);
   }
 
   .modal-wide {
-    max-width: min(640px, 96vw);
+    max-width: min(720px, 96vw);
     max-height: calc(100vh - 40px);
     overflow-y: auto;
   }
 
-  /* ---------------- Scheduling dialog (round 3, #5 & #6) ----------------
-     The scheduling dialog carries far more controls than a normal modal
-     (Day 1 derivation, staff, a variable-length list of compatible Day 2
-     slots, plus any number of new Day 2 rows). It therefore gets its own
-     wider cap, and grows vertically with its content up to the viewport,
-     after which it scrolls internally rather than clipping anything. */
   .modal-schedule {
-    max-width: min(900px, 96vw);
+    max-width: min(960px, 96vw);
     max-height: calc(100vh - 40px);
     overflow-y: auto;
     display: flex;
     flex-direction: column;
   }
 
-  /* Long lists scroll inside themselves so they can never push the action
-     buttons or validation messages out of view. */
   #schedDay2ExistingList {
     max-height: 34vh;
     overflow-y: auto;
     padding-right: 4px;
   }
-
   #schedNewDay2RowsContainer {
     max-height: 40vh;
     overflow-y: auto;
     padding-right: 4px;
   }
 
-  /* Keeps Cancel/Save reachable no matter how much content is displayed. */
   .modal-schedule .modal-actions {
     position: sticky;
     bottom: 0;
     background: #fff;
     padding-top: 12px;
     margin-top: 8px;
-    border-top: 1px solid var(--color-border);
+    border-top: 1px solid var(--border);
     z-index: 1;
-  }
-
-  .btn-small {
-    padding: 4px 10px;
-    font-size: 0.85em;
-    margin-right: 6px;
   }
 
   .modal h3 {
     margin: 0 0 14px;
-    font-size: 17px;
+    font-size: 1.15rem;
+    font-family: var(--font-display);
   }
 
   .modal-actions {
@@ -756,10 +624,7 @@
     gap: 10px;
     margin-top: 6px;
   }
-
-  .modal-actions .btn {
-    flex: 1;
-  }
+  .modal-actions .btn { flex: 1; }
 
   .inline-row { display: flex; gap: 8px; align-items: center; }
   .inline-row input[type="date"] { flex: 1; }
@@ -767,27 +632,33 @@
   .avail-list { list-style: none; padding: 0; margin: 10px 0; }
   .avail-list li {
     display: flex; justify-content: space-between; align-items: center;
-    background: #f1f5f9; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px;
+    background: rgba(20, 122, 128, 0.06); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px;
     font-size: 14px;
   }
   .avail-list button {
-    background: none; border: none; color: #dc2626; cursor: pointer;
+    background: none; border: none; color: var(--error-text); cursor: pointer;
     font-size: 18px; line-height: 1;
   }
 
   .booking-pick-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
   .booking-pick-option {
     display: flex; align-items: center; gap: 8px;
-    padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
-    cursor: pointer; font-size: 14px;
+    padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+    cursor: pointer; font-size: 14px; background: #fff;
+    transition: border-color 0.15s ease, background 0.15s ease;
   }
-  .booking-pick-option:hover { background: #f8fafc; }
+  .booking-pick-option:hover { border-color: var(--teal); background: rgba(20, 122, 128, 0.04); }
   .booking-pick-option.current { border-color: #94a3b8; background: #f1f5f9; }
-  .booking-pick-option.selected { border-color: #2563eb; background: #eff6ff; font-weight: 600; }
+  .booking-pick-option.selected {
+    border-color: var(--teal);
+    background: rgba(20, 122, 128, 0.08);
+    font-weight: 650;
+    box-shadow: 0 0 0 3px var(--teal-glow);
+  }
 
-  /* ---------------- Responsive ---------------- */
+  a { color: var(--teal-deep); }
 
-  @media (max-width: 620px) {
+  @media (max-width: 720px) {
     .form-row { grid-template-columns: 1fr; }
     .day2-row { grid-template-columns: 1fr; }
     .row-remove-btn { justify-self: end; }
@@ -801,9 +672,15 @@
     .modal-actions { flex-wrap: wrap; }
     .modal-actions .btn { flex: 1 1 auto; }
     .banner { word-wrap: break-word; overflow-wrap: break-word; }
-    /* On small screens give the internal lists more of the (already
-       scrollable) modal so controls aren't squeezed into tiny scroll areas. */
     #schedDay2ExistingList { max-height: 46vh; }
     #schedNewDay2RowsContainer { max-height: 52vh; }
+    .project-id-control { flex-direction: column; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation: none !important;
+      transition: none !important;
+    }
   }
 </style>
