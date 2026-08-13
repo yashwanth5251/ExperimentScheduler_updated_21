@@ -178,6 +178,11 @@
         if (projectId) {
           els.projectIdBanner.textContent = 'Project: ' + projectId;
           els.projectIdBanner.classList.remove('hidden');
+          try {
+            if (window.parent && window.parent !== window) {
+              parent.postMessage({ type: 'es-project-id', projectId: projectId }, '*');
+            }
+          } catch (e) { /* ignore */ }
         } else {
           els.projectIdBanner.classList.add('hidden');
         }

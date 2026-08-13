@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Experiment Scheduling</title>
+  <?!= include('ShellStyles'); ?>
+</head>
+<body>
+  <div id="shellProjectBanner" class="project-id-banner hidden"></div>
+
+  <header class="topnav" id="topnav">
+    <div class="topnav-inner">
+      <a href="/?view=book" class="topnav-brand" id="navBrand" data-view="book">
+        <span class="topnav-logo" aria-hidden="true"></span>
+        <span class="topnav-brand-text">
+          <strong>Experiment Scheduler</strong>
+          <small>Research booking</small>
+        </span>
+      </a>
+
+      <button type="button" class="topnav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+
+      <nav class="topnav-links" id="navLinks">
+        <a href="/?view=book" class="topnav-link" data-view="book">Book</a>
+        <a href="/?view=manage" class="topnav-link" data-view="manage">Manage appointment</a>
+        <a href="/?view=admin" class="topnav-link topnav-link-admin hidden" data-view="admin" id="navAdminLink">Admin</a>
+      </nav>
+
+      <div class="topnav-auth" id="navAuth">
+        <button type="button" class="btn-nav btn-nav-primary" id="navLoginBtn">Log in</button>
+        <div class="topnav-user hidden" id="navUser">
+          <div class="topnav-user-meta">
+            <span class="topnav-user-name" id="navUserName">Admin</span>
+            <span class="topnav-user-role" id="navUserRole">MainAdmin</span>
+          </div>
+          <button type="button" class="btn-nav btn-nav-ghost" id="navLogoutBtn">Log out</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell-main">
+    <iframe
+      id="appFrame"
+      class="app-frame"
+      title="Application"
+      src="/book?embed=1"
+    ></iframe>
+  </main>
+
+  <div class="login-modal-overlay hidden" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
+    <div class="login-modal">
+      <button type="button" class="login-modal-close" id="loginModalClose" aria-label="Close">&times;</button>
+      <div class="login-modal-brand">Admin access</div>
+      <h2 id="loginModalTitle">Log in</h2>
+      <p class="login-modal-hint">Use your admin email and password to open scheduling tools.</p>
+      <div class="banner banner-error hidden" id="loginModalError" role="alert"></div>
+      <form id="shellLoginForm">
+        <div class="form-group">
+          <label for="shellEmail">Email</label>
+          <input type="email" id="shellEmail" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label for="shellPassword">Password</label>
+          <input type="password" id="shellPassword" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary" id="shellLoginBtn">
+          <span id="shellLoginBtnText">Log in</span>
+          <span id="shellLoginSpinner" class="spinner hidden"></span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <?!= include('ShellJavaScript'); ?>
+</body>
+</html>

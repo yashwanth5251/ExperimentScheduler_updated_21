@@ -69,11 +69,20 @@ function includeFile(projectRoot, filename) {
   throw new Error('Include not found: ' + filename);
 }
 
-function renderTemplate(projectRoot, templateName) {
+function renderTemplate(projectRoot, templateName, options) {
+  options = options || {};
   let html = includeFile(projectRoot, templateName);
   html = html.replace(/<\?!=\s*include\(['"]([^'"]+)['"]\);\s*\?>/g, function (_, name) {
     return includeFile(projectRoot, name);
   });
+  if (options.embed) {
+    html = html.replace(/<body([^>]*)>/i, function (_m, attrs) {
+      if (/class\s*=/.test(attrs)) {
+        return '<body' + attrs.replace(/class\s*=\s*(["'])([^"']*)(["'])/i, 'class=$1$2 embed$3') + '>';
+      }
+      return '<body class="embed"' + attrs + '>';
+    });
+  }
   // Inject google.script.run shim before </body> or at end
   if (/<\/body>/i.test(html)) {
     html = html.replace(/<\/body>/i, SHIM + '\n</body>');

@@ -1,0 +1,246 @@
+<script>
+(function () {
+  var SESSION_KEY = 'es_admin_session';
+  var VIEWS = {
+    book: '/book?embed=1',
+    manage: '/manage?embed=1',
+    admin: '/admin?embed=1'
+  };
+
+  var frame = document.getElementById('appFrame');
+  var loginModal = document.getElementById('loginModal');
+  var loginError = document.getElementById('loginModalError');
+  var navLoginBtn = document.getElementById('navLoginBtn');
+  var navUser = document.getElementById('navUser');
+  var navAdminLink = document.getElementById('navAdminLink');
+  var topnav = document.getElementById('topnav');
+
+  function createRunner() {
+    var success = null;
+    var failure = null;
+    var proxy = null;
+    var runner = {
+      withSuccessHandler: function (fn) { success = fn; return proxy; },
+      withFailureHandler: function (fn) { failure = fn; return proxy; }
+    };
+    proxy = new Proxy(runner, {
+      get: function (target, prop) {
+        if (prop === 'withSuccessHandler' || prop === 'withFailureHandler') return target[prop];
+        if (prop === 'then' || prop === 'catch' || prop === 'finally' || prop === 'toJSON') return undefined;
+        return function () {
+          var args = Array.prototype.slice.call(arguments);
+          return fetch('/api/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ functionName: String(prop), args: args })
+          }).then(function (res) {
+            return res.json().then(function (body) {
+              if (!res.ok || body.error) {
+                var err = new Error((body && body.error) || res.statusText || 'Server error');
+                if (failure) failure(err);
+                else throw err;
+                return;
+              }
+              if (success) success(body.result);
+              return body.result;
+            });
+          }).catch(function (err) {
+            if (failure) failure(err);
+            else console.error(err);
+          });
+        };
+      }
+    });
+    return proxy;
+  }
+
+  window.google = window.google || {};
+  window.google.script = window.google.script || {};
+  Object.defineProperty(window.google.script, 'run', {
+    get: function () { return createRunner(); },
+    configurable: true
+  });
+
+  function getSession() {
+    try {
+      var raw = sessionStorage.getItem(SESSION_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveSession(session) {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  }
+
+  function clearSession() {
+    sessionStorage.removeItem(SESSION_KEY);
+  }
+
+  function currentView() {
+    var params = new URLSearchParams(window.location.search);
+    var view = (params.get('view') || 'book').toLowerCase();
+    if (view === 'admin' && !getSession()) return 'book';
+    if (!VIEWS[view]) return 'book';
+    return view;
+  }
+
+  function setActiveLinks(view) {
+    document.querySelectorAll('.topnav-link').forEach(function (link) {
+      link.classList.toggle('active', link.getAttribute('data-view') === view);
+    });
+  }
+
+  function updateAuthUI() {
+    var session = getSession();
+    if (session && session.token) {
+      navLoginBtn.classList.add('hidden');
+      navUser.classList.remove('hidden');
+      navAdminLink.classList.remove('hidden');
+      document.getElementById('navUserName').textContent = session.name || session.email || 'Admin';
+      document.getElementById('navUserRole').textContent = session.role || 'Admin';
+    } else {
+      navLoginBtn.classList.remove('hidden');
+      navUser.classList.add('hidden');
+      navAdminLink.classList.add('hidden');
+    }
+  }
+
+  function navigate(view, options) {
+    options = options || {};
+    if (view === 'admin' && !getSession()) {
+      openLogin();
+      return;
+    }
+    if (!VIEWS[view]) view = 'book';
+    setActiveLinks(view);
+    if (!options.skipHistory) {
+      var url = '/?view=' + view;
+      history[options.replace ? 'replaceState' : 'pushState']({ view: view }, '', url);
+    }
+    if (frame.getAttribute('data-view') !== view) {
+      frame.setAttribute('data-view', view);
+      frame.src = VIEWS[view];
+    }
+    topnav.classList.remove('open');
+    document.getElementById('navToggle').setAttribute('aria-expanded', 'false');
+  }
+
+  function openLogin() {
+    loginError.classList.add('hidden');
+    loginError.textContent = '';
+    loginModal.classList.remove('hidden');
+    document.getElementById('shellEmail').focus();
+  }
+
+  function closeLogin() {
+    loginModal.classList.add('hidden');
+  }
+
+  function setLoginBusy(busy) {
+    document.getElementById('shellLoginBtn').disabled = busy;
+    document.getElementById('shellLoginSpinner').classList.toggle('hidden', !busy);
+    document.getElementById('shellLoginBtnText').textContent = busy ? 'Logging in…' : 'Log in';
+  }
+
+  document.getElementById('navToggle').addEventListener('click', function () {
+    var open = topnav.classList.toggle('open');
+    this.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  document.querySelectorAll('[data-view]').forEach(function (el) {
+    el.addEventListener('click', function (evt) {
+      if (el.tagName === 'A') evt.preventDefault();
+      navigate(el.getAttribute('data-view'));
+    });
+  });
+
+  navLoginBtn.addEventListener('click', openLogin);
+  document.getElementById('loginModalClose').addEventListener('click', closeLogin);
+  loginModal.addEventListener('click', function (evt) {
+    if (evt.target === loginModal) closeLogin();
+  });
+
+  document.getElementById('navLogoutBtn').addEventListener('click', function () {
+    var session = getSession();
+    clearSession();
+    updateAuthUI();
+    try {
+      if (session && session.token) {
+        google.script.run.withFailureHandler(function () {}).adminLogout(session.token);
+      }
+    } catch (e) { /* ignore */ }
+    try {
+      frame.contentWindow.postMessage({ type: 'es-admin-logout' }, '*');
+    } catch (e2) { /* ignore */ }
+    navigate('book');
+  });
+
+  document.getElementById('shellLoginForm').addEventListener('submit', function (evt) {
+    evt.preventDefault();
+    var email = document.getElementById('shellEmail').value.trim();
+    var password = document.getElementById('shellPassword').value;
+    if (!email || !password) {
+      loginError.textContent = 'Please enter your email and password.';
+      loginError.classList.remove('hidden');
+      return;
+    }
+    setLoginBusy(true);
+    google.script.run
+      .withSuccessHandler(function (result) {
+        setLoginBusy(false);
+        if (!result || !result.success) {
+          loginError.textContent = (result && result.message) || 'Login failed.';
+          loginError.classList.remove('hidden');
+          return;
+        }
+        saveSession({
+          token: result.token,
+          email: result.email,
+          name: result.name,
+          role: result.role,
+          permissions: result.permissions || []
+        });
+        document.getElementById('shellPassword').value = '';
+        closeLogin();
+        updateAuthUI();
+        navigate('admin');
+      })
+      .withFailureHandler(function (err) {
+        setLoginBusy(false);
+        loginError.textContent = 'Unexpected error: ' + (err && err.message ? err.message : String(err));
+        loginError.classList.remove('hidden');
+      })
+      .adminLogin(email, password);
+  });
+
+  window.addEventListener('message', function (evt) {
+    var data = evt.data || {};
+    if (data.type === 'es-admin-session' && data.session && data.session.token) {
+      saveSession(data.session);
+      updateAuthUI();
+    }
+    if (data.type === 'es-admin-logout') {
+      clearSession();
+      updateAuthUI();
+      navigate('book');
+    }
+    if (data.type === 'es-request-login') {
+      openLogin();
+    }
+    if (data.type === 'es-project-id' && data.projectId) {
+      var banner = document.getElementById('shellProjectBanner');
+      banner.textContent = 'Project ID: ' + data.projectId;
+      banner.classList.remove('hidden');
+    }
+  });
+
+  window.addEventListener('popstate', function () {
+    navigate(currentView(), { skipHistory: true });
+  });
+
+  updateAuthUI();
+  navigate(currentView(), { replace: true });
+})();
+</script>

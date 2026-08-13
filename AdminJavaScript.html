@@ -50,11 +50,91 @@
   };
 
   var els = {};
+  var ADMIN_SESSION_KEY_ = 'es_admin_session';
+
+  function isEmbedded_() {
+    try {
+      return /(?:\?|&)embed=1(?:&|$)/.test(window.location.search) || window.parent !== window;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function persistSessionToShell_() {
+    if (!state.token || !state.session) return;
+    var payload = {
+      token: state.token,
+      email: state.session.email,
+      name: state.session.name,
+      role: state.session.role,
+      permissions: state.session.permissions || []
+    };
+    try { sessionStorage.setItem(ADMIN_SESSION_KEY_, JSON.stringify(payload)); } catch (e) { /* ignore */ }
+    try {
+      if (window.parent && window.parent !== window) {
+        parent.postMessage({ type: 'es-admin-session', session: payload }, '*');
+      }
+    } catch (e2) { /* ignore */ }
+  }
+
+  function clearSessionFromShell_() {
+    try { sessionStorage.removeItem(ADMIN_SESSION_KEY_); } catch (e) { /* ignore */ }
+    try {
+      if (window.parent && window.parent !== window) {
+        parent.postMessage({ type: 'es-admin-logout' }, '*');
+      }
+    } catch (e2) { /* ignore */ }
+  }
+
+  function restoreShellSession_() {
+    try {
+      var raw = sessionStorage.getItem(ADMIN_SESSION_KEY_);
+      if (!raw) return;
+      var saved = JSON.parse(raw);
+      if (!saved || !saved.token) return;
+      state.token = saved.token;
+      state.session = {
+        email: saved.email,
+        name: saved.name,
+        role: saved.role,
+        permissions: saved.permissions || []
+      };
+      if (els.sessionInfo) {
+        els.sessionInfo.textContent = state.session.name + ' — ' + state.session.role;
+      }
+      hide_(els.loginSection);
+      show_(els.dashboard);
+      applyPermissionVisibility_();
+      // Defer data loads until after the rest of DOMContentLoaded wiring
+      setTimeout(function () {
+        loadStaffOptions_();
+        loadOverview_();
+        startAutoRefresh_();
+      }, 0);
+    } catch (e) { /* ignore */ }
+  }
+
+  window.addEventListener('message', function (evt) {
+    var data = evt.data || {};
+    if (data.type === 'es-admin-logout') {
+      stopAutoRefresh_();
+      state.token = null;
+      state.session = null;
+      hide_(els.dashboard);
+      show_(els.loginSection);
+    }
+  });
 
   document.addEventListener('DOMContentLoaded', function () {
     cacheElements_();
+    restoreShellSession_();
     loadAdminContext_();
     loadProjectIdBanner_();
+
+    // If opened inside the unified shell without a session, ask parent to log in
+    if (isEmbedded_() && !state.token) {
+      try { parent.postMessage({ type: 'es-request-login' }, '*'); } catch (e) { /* ignore */ }
+    }
 
     els.loginForm.addEventListener('submit', onLogin_);
     els.refreshBtn.addEventListener('click', loadOverview_);
@@ -351,6 +431,11 @@
         if (projectId) {
           els.projectIdBanner.textContent = 'Project: ' + projectId;
           show_(els.projectIdBanner);
+          try {
+            if (window.parent && window.parent !== window) {
+              parent.postMessage({ type: 'es-project-id', projectId: projectId }, '*');
+            }
+          } catch (e) { /* ignore */ }
         } else {
           hide_(els.projectIdBanner);
         }
@@ -431,6 +516,7 @@
             role: result.role,
             permissions: result.permissions || []
           };
+          persistSessionToShell_();
           els.adminPassword.value = '';
           els.sessionInfo.textContent = state.session.name + ' — ' + state.session.role;
           hide_(els.loginSection);
@@ -466,6 +552,7 @@
     stopAutoRefresh_();
     state.token = null;
     state.session = null;
+    clearSessionFromShell_();
     hide_(els.dashboard);
     show_(els.loginSection);
     clearMessage_();
@@ -478,6 +565,7 @@
     stopAutoRefresh_();
     state.token = null;
     state.session = null;
+    clearSessionFromShell_();
     hide_(els.dashboard);
     show_(els.loginSection);
     showError_('Your admin session has expired. Please log in again.');

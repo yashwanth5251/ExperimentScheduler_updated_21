@@ -556,6 +556,13 @@
     .language-options { flex-direction: column; align-items: center; }
   }
 
+  /* Embedded in unified shell iframe */
+  body.embed .project-id-banner { display: none !important; }
+  body.embed .app-container,
+  body.embed .admin-container {
+    padding-top: 20px;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation: none !important;
@@ -563,3 +570,4 @@
     }
   }
 </style>
+

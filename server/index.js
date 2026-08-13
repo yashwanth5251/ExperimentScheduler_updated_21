@@ -166,30 +166,52 @@ function createApp() {
     const page = String(req.query.page || '').toLowerCase();
     const action = String(req.query.action || '').toLowerCase();
     const admin = String(req.query.admin || '').toLowerCase();
-    if (action === 'manage' || page === 'manage') return res.redirect('/manage');
-    if (page === 'admin' || admin === 'true') return res.redirect('/admin');
-    return res.redirect('/book');
-  });
-
-  app.get('/book', withRuntime, function (_req, res) {
+    // Legacy Apps Script query params → unified shell views
+    if (action === 'manage' || page === 'manage') {
+      return res.redirect('/?view=manage');
+    }
+    if (page === 'admin' || admin === 'true') {
+      return res.redirect('/?view=admin');
+    }
+    if (page === 'book') {
+      return res.redirect('/?view=book');
+    }
     try {
-      res.type('html').send(renderTemplate(projectRoot, 'Index'));
+      res.type('html').send(renderTemplate(projectRoot, 'Shell'));
     } catch (err) {
       res.status(500).send(String(err && err.stack ? err.stack : err));
     }
   });
 
-  app.get('/manage', withRuntime, function (_req, res) {
+  app.get('/book', withRuntime, function (req, res) {
     try {
-      res.type('html').send(renderTemplate(projectRoot, 'Manage'));
+      const embed = String(req.query.embed || '') === '1';
+      if (!embed && req.accepts('html')) {
+        // Prefer unified shell, but keep direct page available for embeds/bookmarks
+        // Only redirect when not embedding
+        return res.redirect('/?view=book');
+      }
+      res.type('html').send(renderTemplate(projectRoot, 'Index', { embed: embed }));
     } catch (err) {
       res.status(500).send(String(err && err.stack ? err.stack : err));
     }
   });
 
-  app.get('/admin', withRuntime, function (_req, res) {
+  app.get('/manage', withRuntime, function (req, res) {
     try {
-      res.type('html').send(renderTemplate(projectRoot, 'Admin'));
+      const embed = String(req.query.embed || '') === '1';
+      if (!embed) return res.redirect('/?view=manage');
+      res.type('html').send(renderTemplate(projectRoot, 'Manage', { embed: true }));
+    } catch (err) {
+      res.status(500).send(String(err && err.stack ? err.stack : err));
+    }
+  });
+
+  app.get('/admin', withRuntime, function (req, res) {
+    try {
+      const embed = String(req.query.embed || '') === '1';
+      if (!embed) return res.redirect('/?view=admin');
+      res.type('html').send(renderTemplate(projectRoot, 'Admin', { embed: true }));
     } catch (err) {
       res.status(500).send(String(err && err.stack ? err.stack : err));
     }

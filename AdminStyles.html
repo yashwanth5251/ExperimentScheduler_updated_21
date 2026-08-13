@@ -677,6 +677,15 @@
     .project-id-control { flex-direction: column; }
   }
 
+  /* Embedded in unified shell iframe */
+  body.embed .project-id-banner { display: none !important; }
+  body.embed .admin-container { padding-top: 18px; }
+  body.embed #loginSection {
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation: none !important;
