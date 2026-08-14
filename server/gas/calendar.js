@@ -1,5 +1,11 @@
 'use strict';
 
+// Calendar invites are controlled by CALENDAR_* matrices in Code.gs and are
+// independent of NOTIFICATION_* email matrices. Google Calendar API updates
+// often appear "silent" in Gmail (event appears on calendar without a loud
+// inbox message), while Outlook typically surfaces a visible meeting request.
+// That difference is client/provider behaviour, not the email notification matrix.
+
 const fs = require('fs');
 const path = require('path');
 const { google } = require('googleapis');

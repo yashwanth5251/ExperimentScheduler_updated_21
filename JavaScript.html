@@ -298,49 +298,54 @@
   }
 
   function applyTranslations_(lang) {
-    var t = I18N[lang];
+    var t = I18N[lang] || I18N.en;
+    if (!t) return;
     document.documentElement.setAttribute('lang', lang);
 
-    els.headerTitle.textContent = t.headerTitle;
-    els.headerSubtitle.textContent = t.headerSubtitle;
+    function setText_(el, value) {
+      if (el && value != null) el.textContent = value;
+    }
 
-    els.stepLabel1.textContent = t.stepLabel1;
-    els.stepLabel2.textContent = t.stepLabel2;
-    els.stepLabel3.textContent = t.stepLabel3;
+    setText_(els.headerTitle, t.headerTitle);
+    setText_(els.headerSubtitle, t.headerSubtitle);
 
-    els.day1Heading.textContent = t.day1Heading;
-    els.day1Hint.textContent = t.day1Hint;
-    els.day1Loading.textContent = t.day1Loading;
-    els.day1Empty.textContent = t.day1Empty;
+    setText_(els.stepLabel1, t.stepLabel1);
+    setText_(els.stepLabel2, t.stepLabel2);
+    setText_(els.stepLabel3, t.stepLabel3);
 
-    els.day2Heading.textContent = t.day2Heading;
-    els.day2Hint.textContent = t.day2Hint;
-    els.day2Loading.textContent = t.day2Loading;
-    els.day2Empty.textContent = t.day2Empty;
+    setText_(els.day1Heading, t.day1Heading);
+    setText_(els.day1Hint, t.day1Hint);
+    setText_(els.day1Loading, t.day1Loading);
+    setText_(els.day1Empty, t.day1Empty);
 
-    els.detailsHeading.textContent = t.detailsHeading;
-    els.labelTitle.textContent = t.labelTitle;
-    els.titlePlaceholderOption.textContent = t.titlePlaceholder;
-    els.labelGender.textContent = t.labelGender;
-    els.genderPlaceholderOption.textContent = t.genderPlaceholder;
-    els.labelFirstName.textContent = t.labelFirstName;
-    els.labelLastName.textContent = t.labelLastName;
-    els.labelEmail.textContent = t.labelEmail;
-    els.submitBtnText.textContent = t.submitBtnText;
+    setText_(els.day2Heading, t.day2Heading);
+    setText_(els.day2Hint, t.day2Hint);
+    setText_(els.day2Loading, t.day2Loading);
+    setText_(els.day2Empty, t.day2Empty);
 
-    els.confirmedHeading.textContent = t.confirmedHeading;
-    els.confirmedNote.textContent = t.confirmedNote;
+    setText_(els.detailsHeading, t.detailsHeading);
+    setText_(els.labelTitle, t.labelTitle);
+    setText_(els.titlePlaceholderOption, t.titlePlaceholder);
+    setText_(els.labelGender, t.labelGender);
+    setText_(els.genderPlaceholderOption, t.genderPlaceholder);
+    setText_(els.labelFirstName, t.labelFirstName);
+    setText_(els.labelLastName, t.labelLastName);
+    setText_(els.labelEmail, t.labelEmail);
+    setText_(els.submitBtnText, t.submitBtnText);
+
+    setText_(els.confirmedHeading, t.confirmedHeading);
+    setText_(els.confirmedNote, t.confirmedNote);
     var lc = document.getElementById('labelComments');
     var ch = document.getElementById('commentsHint');
-    if (lc) lc.textContent = t.labelComments;
-    if (ch) ch.textContent = t.commentsHint;
-    els.confLocationHeading.textContent = t.confLocationHeading;
+    setText_(lc, t.labelComments);
+    setText_(ch, t.commentsHint);
+    setText_(els.confLocationHeading, t.confLocationHeading);
 
-    els.helpToggleLink.textContent = t.helpHeading;
-    els.helpLabelName.textContent = t.helpLabelName;
-    els.helpLabelEmail.textContent = t.helpLabelEmail;
-    els.helpLabelMessage.textContent = t.helpLabelMessage;
-    els.helpSubmitBtnText.textContent = t.helpSubmitBtnText;
+    setText_(els.helpToggleLink, t.helpHeading);
+    setText_(els.helpLabelName, t.helpLabelName);
+    setText_(els.helpLabelEmail, t.helpLabelEmail);
+    setText_(els.helpLabelMessage, t.helpLabelMessage);
+    setText_(els.helpSubmitBtnText, t.helpSubmitBtnText);
   }
 
   // ---------------------------------------------------------------------

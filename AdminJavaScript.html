@@ -168,9 +168,13 @@
     }
     loadAdminContext_();
     loadProjectIdBanner_();
+    clearMessage_();
 
     els.loginForm.addEventListener('submit', onLogin_);
-    els.refreshBtn.addEventListener('click', loadOverview_);
+    els.refreshBtn.addEventListener('click', function () {
+      clearMessage_();
+      loadOverview_();
+    });
     els.logoutBtn.addEventListener('click', onLogout_);
     els.projectIdSaveBtn.addEventListener('click', onSaveProjectId_);
 
@@ -391,10 +395,12 @@
       'adminsTable', 'adminsTableBody', 'newAdminName', 'newAdminEmail', 'newAdminRole',
       'newAdminPassword', 'createAdminBtn', 'adminsCloseBtn',
       'deleteDay1ModalOverlay', 'deleteDay1ModalText', 'deleteDay1OrphanList',
+      'deleteDay1RelatedBox', 'deleteDay1RelatedList',
       'deleteDay1CancelBtn', 'deleteDay1ConfirmBtn',
       'deleteDay2ModalOverlay', 'deleteDay2ModalText', 'deleteDay2CancelBtn', 'deleteDay2ConfirmBtn',
-      'bookedActionModalOverlay', 'bookedActionModalText', 'bookedActionCancelBtn',
-      'bookedActionUnbookBtn', 'bookedActionDeleteBtn',
+      'bookedActionModalOverlay', 'bookedActionModalText', 'bookedActionBookingHint',
+      'bookedActionRelatedBox', 'bookedActionRelatedList',
+      'bookedActionCancelBtn', 'bookedActionUnbookBtn', 'bookedActionDeleteBtn',
       'scheduleModalOverlay', 'scheduleModalMriText', 'scheduleModalError',
       'schedTimeBeforeMri', 'schedMriDuration', 'schedDay1DateDisplay', 'schedDay1StartDisplay',
       'schedDay1EndDisplay', 'schedMriResizeMsg', 'schedDay1CollisionMsg', 'schedDay1StaffSelect', 'schedLanguageSelect',
@@ -421,7 +427,8 @@
       'taBdGridTable', 'taBdGridMonthRow', 'taBdGridDayRow', 'taBdGridTimeRow', 'taBdGridNameRow',
       'taBdGridSubmitRow', 'taBdGridPeopleBody', 'taBdGridTotalsRow', 'taBdGridEmpty', 'bdCloseBtn',
       'bdEditModalOverlay', 'bdEditError', 'bdEditSuccess', 'bdEditSlotID', 'bdEditDate', 'bdEditStart',
-      'bdEditEnd', 'bdEditStaffSelect', 'bdEditTASelect', 'bdEditSaveBtn', 'bdEditCancelBtn',
+      'bdEditEnd', 'bdEditStaffSelect', 'bdEditTASelect', 'bdEditRelatedSlotID', 'bdEditRelatedHint',
+      'bdEditSaveBtn', 'bdEditCancelBtn',
       'taAvailabilityBtn', 'taAvailModalOverlay', 'taAvailError', 'taAvailSuccess',
       'taAvailDate', 'taAvailStart', 'taAvailEnd', 'taAvailNotes', 'taAvailSaveBtn',
       'taAvailTable', 'taAvailTableBody', 'taAvailCloseBtn',
@@ -877,7 +884,8 @@
     state.staffOptions.forEach(function (s) {
       var opt = document.createElement('option');
       opt.value = s.email;
-      opt.textContent = s.name + ' <' + s.email + '>';
+      // Name only outside Admin Management (no role suffix, no raw email in label).
+      opt.textContent = s.name || s.email;
       if (currentValue && s.email.toLowerCase() === String(currentValue).toLowerCase()) {
         opt.selected = true;
       }
@@ -1026,8 +1034,17 @@
   function filterSortSlots_(slots, searchText, statusFilter, sortBy, sortDir, searchFields) {
     var q = String(searchText || '').trim().toLowerCase();
     var filtered = (slots || []).filter(function (s) {
-      if (statusFilter === 'available' && s.booked) return false;
-      if (statusFilter === 'booked' && !s.booked) return false;
+      if (statusFilter === 'available') {
+        if (s.status) { if (s.status !== 'Available') return false; }
+        else if (s.booked) return false;
+      }
+      if (statusFilter === 'unavailable') {
+        if (s.status !== 'Unavailable') return false;
+      }
+      if (statusFilter === 'booked') {
+        if (s.status) { if (s.status !== 'Booked') return false; }
+        else if (!s.booked) return false;
+      }
       if (!q) return true;
       return searchFields.some(function (f) {
         return String(s[f] || '').toLowerCase().indexOf(q) !== -1;
@@ -2182,41 +2199,84 @@
   // ---------------------------------------------------------------------
 
   function openDeleteDay1Modal_(slot) {
-    state.pendingDeleteDay1 = { slot: slot, confirmOrphans: false };
+    state.pendingDeleteDay1 = { slot: slot, confirmOrphans: false, related: [] };
     els.deleteDay1ModalText.textContent =
       'Delete Day 1 slot ' + slot.slotID + ' (' + slot.date + ' ' + slot.startTime + '\u2013' + slot.endTime + ')?';
     els.deleteDay1OrphanList.innerHTML = '';
+    if (els.deleteDay1RelatedList) els.deleteDay1RelatedList.innerHTML = '';
+    if (els.deleteDay1RelatedBox) els.deleteDay1RelatedBox.classList.add('hidden');
     els.deleteDay1ConfirmBtn.textContent = 'Delete';
     els.deleteDay1ConfirmBtn.disabled = false;
     show_(els.deleteDay1ModalOverlay);
+  }
+
+  function collectDeleteDay1RelatedSelection_() {
+    var day2Ids = [];
+    var bloodDrawingIds = [];
+    var mri = false;
+    var box = els.deleteDay1RelatedList;
+    if (!box) return { day2Ids: day2Ids, bloodDrawingIds: bloodDrawingIds, mri: mri };
+    Array.prototype.slice.call(box.querySelectorAll('input[type="checkbox"]')).forEach(function (cb) {
+      if (!cb.checked) return;
+      var kind = cb.getAttribute('data-kind');
+      if (kind === 'day2') day2Ids.push(cb.value);
+      else if (kind === 'bloodDrawing') bloodDrawingIds.push(cb.value);
+      else if (kind === 'mri') mri = true;
+    });
+    return { day2Ids: day2Ids, bloodDrawingIds: bloodDrawingIds, mri: mri };
+  }
+
+  function renderRelatedCheckboxes_(container, related, hideDeleteOnlyForUnbook) {
+    container.innerHTML = '';
+    (related || []).forEach(function (r) {
+      if (hideDeleteOnlyForUnbook && r.deleteOnly) return;
+      var label = document.createElement('label');
+      label.style.display = 'block';
+      label.style.marginBottom = '6px';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = r.slotID;
+      cb.setAttribute('data-kind', r.kind);
+      cb.checked = !!r.defaultChecked;
+      if (r.required) { cb.checked = true; cb.disabled = true; }
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(' ' + (r.label || (r.kind + ' ' + r.slotID))));
+      container.appendChild(label);
+    });
   }
 
   function onConfirmDeleteDay1_() {
     if (!state.pendingDeleteDay1) return;
     var slotID = state.pendingDeleteDay1.slot.slotID;
     var confirmOrphans = state.pendingDeleteDay1.confirmOrphans;
+    var selectedRelated = confirmOrphans ? collectDeleteDay1RelatedSelection_() : null;
 
     els.deleteDay1ConfirmBtn.disabled = true;
     google.script.run
       .withSuccessHandler(function (result) {
         els.deleteDay1ConfirmBtn.disabled = false;
         if (result && result.requiresConfirmation) {
-          // Show the cascade-impact warning and let the admin confirm a second time.
           state.pendingDeleteDay1.confirmOrphans = true;
+          state.pendingDeleteDay1.related = result.related || [];
           els.deleteDay1ModalText.textContent = result.message;
           els.deleteDay1OrphanList.innerHTML = '';
-          (result.orphanedDay2 || []).forEach(function (d2) {
-            var li = document.createElement('li');
-            li.textContent = 'Day 2: ' + d2.slotID + ' (' + d2.date + ' ' + d2.startTime + '\u2013' + d2.endTime + ')';
-            els.deleteDay1OrphanList.appendChild(li);
-          });
-          (result.linkedBloodDrawing || []).forEach(function (bd) {
-            var li = document.createElement('li');
-            li.textContent = 'Blood Drawing: ' + bd.slotID + ' (' + bd.date + ' ' + bd.startTime + '\u2013' + bd.endTime + ')' +
-              (bd.booked ? ' \u2014 booked' : '');
-            els.deleteDay1OrphanList.appendChild(li);
-          });
-          els.deleteDay1ConfirmBtn.textContent = 'Delete Anyway';
+          if (els.deleteDay1RelatedBox && els.deleteDay1RelatedList && (result.related || []).length) {
+            els.deleteDay1RelatedBox.classList.remove('hidden');
+            renderRelatedCheckboxes_(els.deleteDay1RelatedList, result.related, false);
+          } else {
+            (result.orphanedDay2 || []).forEach(function (d2) {
+              var li = document.createElement('li');
+              li.textContent = 'Day 2: ' + d2.slotID + ' (' + d2.date + ' ' + d2.startTime + '\u2013' + d2.endTime + ')';
+              els.deleteDay1OrphanList.appendChild(li);
+            });
+            (result.linkedBloodDrawing || []).forEach(function (bd) {
+              var li = document.createElement('li');
+              li.textContent = 'Blood Drawing: ' + bd.slotID + ' (' + bd.date + ' ' + bd.startTime + '\u2013' + bd.endTime + ')' +
+                (bd.booked ? ' \u2014 booked' : '');
+              els.deleteDay1OrphanList.appendChild(li);
+            });
+          }
+          els.deleteDay1ConfirmBtn.textContent = 'Confirm Delete';
           return;
         }
         hide_(els.deleteDay1ModalOverlay);
@@ -2235,7 +2295,7 @@
         if (isSessionError_(err)) { handleSessionExpired_(); return; }
         showError_('Unexpected error: ' + errorText_(err));
       })
-      .deleteDay1Slot(state.token, slotID, confirmOrphans);
+      .deleteDay1Slot(state.token, slotID, confirmOrphans, selectedRelated);
   }
 
   function openDeleteDay2Modal_(slot) {
@@ -2301,16 +2361,68 @@
 
   function openBookedActionModal_(slot) {
     state.pendingBookedAction = slot;
+    state.bookedActionPreview = null;
     els.bookedActionModalText.textContent =
       'Day 1 slot ' + slot.slotID + ' (' + slot.date + ' ' + slot.startTime + '\u2013' + slot.endTime + ') is booked.';
-    els.bookedActionUnbookBtn.disabled = false;
-    els.bookedActionDeleteBtn.disabled = false;
+    if (els.bookedActionBookingHint) els.bookedActionBookingHint.textContent = 'Loading related slots\u2026';
+    if (els.bookedActionRelatedList) els.bookedActionRelatedList.innerHTML = '';
+    if (els.bookedActionRelatedBox) els.bookedActionRelatedBox.classList.add('hidden');
+    els.bookedActionUnbookBtn.disabled = true;
+    els.bookedActionDeleteBtn.disabled = true;
     show_(els.bookedActionModalOverlay);
+
+    google.script.run
+      .withSuccessHandler(function (preview) {
+        state.bookedActionPreview = preview;
+        if (preview && preview.success) {
+          if (els.bookedActionBookingHint) {
+            els.bookedActionBookingHint.textContent =
+              'Confirmation number: ' + (preview.bookingID || '(none)') +
+              (preview.participantName ? (' \u2014 ' + preview.participantName) : '');
+          }
+          if (els.bookedActionRelatedBox && els.bookedActionRelatedList && (preview.related || []).length) {
+            els.bookedActionRelatedBox.classList.remove('hidden');
+            renderRelatedCheckboxes_(els.bookedActionRelatedList, preview.related, false);
+          }
+        } else if (els.bookedActionBookingHint) {
+          els.bookedActionBookingHint.textContent = (preview && preview.message) || 'Could not load booking details.';
+        }
+        els.bookedActionUnbookBtn.disabled = false;
+        els.bookedActionDeleteBtn.disabled = false;
+      })
+      .withFailureHandler(function (err) {
+        if (els.bookedActionBookingHint) els.bookedActionBookingHint.textContent = errorText_(err);
+        els.bookedActionUnbookBtn.disabled = false;
+        els.bookedActionDeleteBtn.disabled = false;
+        if (isSessionError_(err)) handleSessionExpired_();
+      })
+      .getBookedDay1ActionPreview(state.token, slot.slotID);
+  }
+
+  function collectBookedActionSelectedKinds_(action) {
+    var selected = { day2: false, bloodDrawing: false, mri: false };
+    var box = els.bookedActionRelatedList;
+    if (!box) return { day2: true, bloodDrawing: true, mri: false };
+    Array.prototype.slice.call(box.querySelectorAll('input[type="checkbox"]')).forEach(function (cb) {
+      var kind = cb.getAttribute('data-kind');
+      if (kind === 'day1') return;
+      if (kind === 'mri') {
+        if (action === 'delete' && cb.checked) selected.mri = true;
+        return;
+      }
+      if (cb.checked) selected[kind] = true;
+    });
+    // If no checkboxes rendered, keep legacy defaults.
+    if (!box.querySelectorAll('input[type="checkbox"]').length) {
+      return { day2: true, bloodDrawing: true, mri: false };
+    }
+    return selected;
   }
 
   function onBookedAction_(action) {
     if (!state.pendingBookedAction) return;
     var slotID = state.pendingBookedAction.slotID;
+    var options = { selectedKinds: collectBookedActionSelectedKinds_(action) };
 
     els.bookedActionUnbookBtn.disabled = true;
     els.bookedActionDeleteBtn.disabled = true;
@@ -2333,7 +2445,7 @@
         if (isSessionError_(err)) { handleSessionExpired_(); return; }
         showError_('Unexpected error: ' + errorText_(err));
       })
-      .handleBookedDay1Slot(state.token, slotID, action);
+      .handleBookedDay1Slot(state.token, slotID, action, options);
   }
 
   function smallBtn_(label, handler, spaced, extraClass) {
@@ -2530,7 +2642,7 @@
   var schedNewDay2RowCounter = 0;
   var schedNewDay2CollisionTimers = {};
 
-  function openScheduleModal_(mriSlot) {
+  function openScheduleModal_(mriSlot, savedConfig) {
     state.currentScheduleMri = mriSlot;
     state.currentDay1DateTime = null;
     state.day1Blocked = true;
@@ -2541,8 +2653,9 @@
     hide_(els.schedStaffConflictBox);
     hide_(els.schedMriOverlapBox);
 
-    els.schedTimeBeforeMri.value = TIME_BEFORE_MRI_DEFAULT;
-    els.schedMriDuration.value = mriDurationOf_(mriSlot);
+    var cfg = savedConfig || null;
+    els.schedTimeBeforeMri.value = (cfg && cfg.timeBeforeMriMinutes) || TIME_BEFORE_MRI_DEFAULT;
+    els.schedMriDuration.value = (cfg && cfg.mriDurationMinutes) || mriDurationOf_(mriSlot);
     els.schedDay1DateDisplay.value = '';
     els.schedDay1StartDisplay.value = '';
     els.schedDay1EndDisplay.value = '';
@@ -2553,25 +2666,53 @@
     els.schedNewDay2RowsContainer.innerHTML = '';
     els.scheduleSaveBtn.disabled = true;
 
-    populateStaffSelect_(els.schedDay1StaffSelect, null);
+    populateStaffSelect_(els.schedDay1StaffSelect, cfg && cfg.day1StaffEmail ? cfg.day1StaffEmail : null);
     els.schedDay1StaffSelect.onchange = function () {
-      // Round 5 fix: the Day 1 preview now needs to know WHICH staff member
-      // is selected to detect a same-staff conflict on a permitted overlap
-      // (previously this only re-ran the separate, legacy staff-busy check
-      // and never re-validated Day 1 itself against the new staff choice).
       refreshScheduleDay1_();
     };
-    populateLanguageSelect_(els.schedLanguageSelect, null);
-    // Round 9 fix: the existing-Day2 candidate list (the "22\u201326h window"
-    // list) never reacted to the Session Language dropdown at all \u2014 it
-    // showed every compatible Day 2 slot regardless of language and never
-    // displayed each slot's own language. Re-running the Day 1 preview
-    // pipeline on change re-filters/re-labels that list (see
-    // refreshScheduleDay2Window_ below).
+    populateLanguageSelect_(els.schedLanguageSelect, cfg && cfg.language ? cfg.language : null);
     els.schedLanguageSelect.onchange = function () { refreshScheduleDay1_(); };
 
     show_(els.scheduleModalOverlay);
     refreshScheduleDay1_();
+
+    // Restore previously configured Day 2 selections after the window list loads.
+    if (cfg) {
+      setTimeout(function () {
+        applySavedScheduleConfig_(cfg);
+      }, 400);
+    }
+  }
+
+  function applySavedScheduleConfig_(cfg) {
+    if (!cfg) return;
+    if (cfg.day1StaffEmail && els.schedDay1StaffSelect) {
+      els.schedDay1StaffSelect.value = cfg.day1StaffEmail;
+    }
+    if (cfg.language && els.schedLanguageSelect) {
+      els.schedLanguageSelect.value = cfg.language;
+    }
+    (cfg.existingDay2 || []).forEach(function (sel) {
+      var row = els.schedDay2ExistingList.querySelector('[data-slot-id="' + sel.slotID + '"]');
+      if (!row) return;
+      var cb = row.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = true;
+      var staffSel = row.querySelector('select');
+      if (staffSel && sel.staffEmail) staffSel.value = sel.staffEmail;
+    });
+    (cfg.newDay2List || []).forEach(function (row) {
+      addSchedDay2Row_();
+      var last = els.schedNewDay2RowsContainer.lastElementChild;
+      if (!last) return;
+      var dateEl = last.querySelector('.sched-new-day2-date');
+      var startEl = last.querySelector('.sched-new-day2-start');
+      var durEl = last.querySelector('.sched-new-day2-duration');
+      var staffEl = last.querySelector('.sched-new-day2-staff');
+      if (dateEl) dateEl.value = row.date || '';
+      if (startEl) startEl.value = row.startTime || '';
+      if (durEl) durEl.value = row.durationMinutes || DAY2_DEFAULT_DURATION;
+      if (staffEl && row.staffEmail) staffEl.value = row.staffEmail;
+    });
   }
 
   // NOTE (round 5): the old "Step 3 — staff availability" check
@@ -3554,7 +3695,7 @@
     var filtered = filterSortSlots_(
       withLabels, els.bdSearch.value, els.bdStatusFilter.value,
       els.bdSortBy.value, els.bdSortDir.value,
-      ['slotID', 'assignedStaffLabel', 'assignedTALabel', 'date', 'day1SlotID', 'participantName']
+      ['slotID', 'assignedStaffLabel', 'assignedTALabel', 'date', 'day1SlotID', 'relatedSlotID', 'mriSlotID', 'participantName', 'status']
     );
     renderBdTable_(filtered);
   }
@@ -3584,10 +3725,11 @@
     els.bdTableBody.innerHTML = '';
     (slots || []).forEach(function (s) {
       var tr = document.createElement('tr');
-      [s.slotID, s.date, s.startTime, s.endTime, s.day1SlotID || '\u2014',
+      var statusLabel = s.status || (s.booked ? 'Booked' : 'Available');
+      [s.slotID, s.date, s.startTime, s.endTime, s.relatedSlotID || s.mriSlotID || s.day1SlotID || '\u2014',
        s.assignedStaff ? staffNameFor_(s.assignedStaff) : '\u2014',
        (s.assignedTANames && s.assignedTANames.length) ? s.assignedTANames.join(', ') : '\u2014',
-       s.participantName || '\u2014', s.booked ? 'Booked' : 'Available'
+       s.participantName || '\u2014', statusLabel
       ].forEach(function (v) {
         var td = document.createElement('td'); td.textContent = v; tr.appendChild(td);
       });
@@ -3599,14 +3741,14 @@
         editBtn.addEventListener('click', function () { openEditBloodDrawingModal_(s); });
         actionTd.appendChild(editBtn);
       }
-      if (can_('book_blood_drawing') && s.booked) {
+      if (can_('book_blood_drawing') && (s.booked || s.status === 'Booked')) {
         var cancelBtn = document.createElement('button');
         cancelBtn.type = 'button'; cancelBtn.className = 'btn btn-secondary btn-small';
         cancelBtn.textContent = 'Cancel Booking';
         cancelBtn.addEventListener('click', function () { onCancelBloodDrawingBooking_(s.slotID); });
         actionTd.appendChild(cancelBtn);
       }
-      if (can_('manage_blood_drawing_schedules') && !s.booked) {
+      if (can_('manage_blood_drawing_schedules') && statusLabel !== 'Booked') {
         var delBtn = document.createElement('button');
         delBtn.type = 'button'; delBtn.className = 'btn btn-secondary btn-small';
         delBtn.textContent = 'Delete';
@@ -3788,8 +3930,13 @@
       m.days.forEach(function (d) {
         d.slots.forEach(function (s) {
           var th = document.createElement('th');
-          th.textContent = s.timeLabel;
-          th.title = s.bookingID ? ('Booking ID: ' + s.bookingID) : 'No Booking ID yet';
+          var booked = !!s.booked;
+          th.textContent = s.timeLabel + (booked ? '\nBooked' : '\nUnbooked');
+          th.style.whiteSpace = 'pre-line';
+          th.className = booked ? 'ta-grid-slot-booked' : 'ta-grid-slot-unbooked';
+          th.title = booked
+            ? ('Booked' + (s.bookingID ? (' — Confirmation: ' + s.bookingID) : ''))
+            : 'Unbooked — no participant yet';
           els.taBdGridTimeRow.appendChild(th);
         });
       });
@@ -3935,6 +4082,17 @@
       els.bdEditTASelect.appendChild(opt);
     });
 
+    if (els.bdEditRelatedSlotID) {
+      els.bdEditRelatedSlotID.value = slot.relatedSlotID || slot.mriSlotID || '';
+      var locked = !!slot.relatedSlotLocked;
+      els.bdEditRelatedSlotID.readOnly = locked;
+      if (els.bdEditRelatedHint) {
+        els.bdEditRelatedHint.textContent = locked
+          ? 'Linked from MRI — Related Slot ID is read-only.'
+          : 'Manual slot — you can set a Related Slot ID (e.g. MRI-001).';
+      }
+    }
+
     show_(els.bdEditModalOverlay);
   }
 
@@ -3954,6 +4112,9 @@
       assignedStaff: els.bdEditStaffSelect.value,
       taEmails: taEmails
     };
+    if (els.bdEditRelatedSlotID && !els.bdEditRelatedSlotID.readOnly) {
+      data.relatedSlotID = els.bdEditRelatedSlotID.value;
+    }
     els.bdEditSaveBtn.disabled = true;
     google.script.run
       .withSuccessHandler(function (result) {
@@ -4637,6 +4798,12 @@
     clearModalBanner_(els.bulkMriError);
     clearModalBanner_(els.bulkMriSuccess);
     var candidates = collectBulkMriCandidates_();
+    // Clear every row's previous validation status so nothing stale remains
+    // (including rows that may have been unchecked/edited since last run).
+    candidates.forEach(function (c) {
+      var td = c.row.querySelector('.bulk-mri-validation');
+      if (td) { td.textContent = ''; td.style.color = ''; }
+    });
     if (!candidates.length) { setModalBanner_(els.bulkMriError, 'Add at least one MRI slot first.', true); return; }
 
     google.script.run
@@ -4667,11 +4834,15 @@
   }
 
   function onSaveBulkMri_() {
+    if (els.bulkMriSaveBtn.disabled) return;
     clearModalBanner_(els.bulkMriError);
     clearModalBanner_(els.bulkMriSuccess);
     var candidates = collectBulkMriCandidates_();
+    els.bulkMriSaveBtn.disabled = true;
+    els.bulkMriValidateBtn.disabled = true;
     google.script.run
       .withSuccessHandler(function (result) {
+        els.bulkMriValidateBtn.disabled = false;
         if (result && result.success) {
           setModalBanner_(els.bulkMriSuccess, result.message, false);
           var createdIds = (result.created || []).map(function (m) { return m.slotID; });
@@ -4693,15 +4864,19 @@
               show_(els.bulkMriPushSection);
             })
             .withFailureHandler(function (err) {
+              els.bulkMriSaveBtn.disabled = false;
               if (isSessionError_(err)) { handleSessionExpired_(); return; }
               setModalBanner_(els.bulkMriError, 'Slots were saved, but the list could not be refreshed: ' + errorText_(err), true);
             })
             .getAdminSlotsOverview(state.token);
         } else {
+          els.bulkMriSaveBtn.disabled = false;
           setModalBanner_(els.bulkMriError, (result && result.message) || 'Could not save MRI slots.', true);
         }
       })
       .withFailureHandler(function (err) {
+        els.bulkMriSaveBtn.disabled = false;
+        els.bulkMriValidateBtn.disabled = false;
         if (isSessionError_(err)) { handleSessionExpired_(); return; }
         setModalBanner_(els.bulkMriError, errorText_(err), true);
       })
@@ -4754,7 +4929,7 @@
   function openBulkConfigureFor_(mri) {
     state.bulkConfigMode = true;
     hide_(els.bulkMriModalOverlay);
-    openScheduleModal_(mri);
+    openScheduleModal_(mri, state.bulkConfigs[mri.slotID] || null);
     els.scheduleSaveBtnText.textContent = 'Use This Configuration';
   }
 

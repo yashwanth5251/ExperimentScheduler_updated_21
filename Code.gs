@@ -402,11 +402,16 @@ var CONFIG = {
     { key: 'bloodDrawingAssignment', label: 'Blood Drawing Assignment' },
     { key: 'bloodDrawingReassignment', label: 'Blood Drawing Reassignment' },
     { key: 'bloodDrawingUpdates', label: 'Blood Drawing Slot Updated' },
+    { key: 'bloodDrawingSlotBooked', label: 'Blood Drawing Slot Booked' },
+    { key: 'bloodDrawingSlotUnbooked', label: 'Blood Drawing Slot Unbooked' },
     { key: 'bloodDrawingUnassigned', label: 'Blood Drawing Slot Unassigned (no TA available)' },
+    { key: 'day1ScheduleCreated', label: 'Day 1 Schedule Created' },
+    { key: 'day2ScheduleCreated', label: 'Day 2 Schedule Created' },
     { key: 'participantBooking', label: 'Participant Booking' },
     { key: 'bookingRescheduled', label: 'Booking Rescheduled' },
     { key: 'bookingCancelled', label: 'Booking Cancelled' },
-    { key: 'bookingUnbooked', label: 'Booking Unbooked' },
+    { key: 'bookingUnbooked', label: 'Booking Unbooked (admin)' },
+    { key: 'adminBookingUnbooked', label: 'Admin Unbooking' },
     { key: 'participantMessages', label: 'Participant Messages' },
     { key: 'taAvailabilitySubmitted', label: 'TA Availability Submitted' },
     { key: 'checklistUpdated', label: 'Experiment Checklist Updated' },
@@ -456,11 +461,16 @@ var CONFIG = {
     bloodDrawingAssignment: ['MainAdmin', 'BloodDrawingStaff', 'TechnicalAssistants'],
     bloodDrawingReassignment: ['MainAdmin', 'BloodDrawingStaff', 'TechnicalAssistants'],
     bloodDrawingUpdates: ['MainAdmin', 'BloodDrawingStaff', 'TechnicalAssistants'],
+    bloodDrawingSlotBooked: ['MainAdmin', 'BloodDrawingStaff', 'TechnicalAssistants'],
+    bloodDrawingSlotUnbooked: ['MainAdmin', 'BloodDrawingStaff', 'TechnicalAssistants'],
     bloodDrawingUnassigned: ['MainAdmin'],
+    day1ScheduleCreated: ['MainAdmin', 'AssignedStaff'],
+    day2ScheduleCreated: ['MainAdmin', 'AssignedStaff'],
     participantBooking: ['MainAdmin', 'Participants'],
     bookingRescheduled: ['MainAdmin', 'AssignedStaff', 'Participants'],
     bookingCancelled: ['MainAdmin', 'AssignedStaff', 'Participants'],
     bookingUnbooked: ['MainAdmin', 'AssignedStaff'],
+    adminBookingUnbooked: ['MainAdmin', 'AssignedStaff', 'BloodDrawingStaff', 'TechnicalAssistants'],
     participantMessages: ['MainAdmin', 'Admins'],
     taAvailabilitySubmitted: ['MainAdmin', 'TechnicalAssistants'],
     checklistUpdated: ['MainAdmin'],
@@ -555,6 +565,31 @@ var CONFIG = {
     },
     bookingUnbooked: {
       subjectDe: 'Termin abgesagt', subjectEn: 'Booking Unbooked',
+      bodyDe: '{{Details}}',
+      bodyEn: '{{Details}}'
+    },
+    adminBookingUnbooked: {
+      subjectDe: 'Admin-Absage', subjectEn: 'Admin Unbooking',
+      bodyDe: '{{Details}}',
+      bodyEn: '{{Details}}'
+    },
+    bloodDrawingSlotBooked: {
+      subjectDe: 'Blutentnahme gebucht', subjectEn: 'Blood Drawing Slot Booked',
+      bodyDe: '{{Details}}',
+      bodyEn: '{{Details}}'
+    },
+    bloodDrawingSlotUnbooked: {
+      subjectDe: 'Blutentnahme freigegeben', subjectEn: 'Blood Drawing Slot Unbooked',
+      bodyDe: '{{Details}}',
+      bodyEn: '{{Details}}'
+    },
+    day1ScheduleCreated: {
+      subjectDe: 'Tag-1-Zeitplan erstellt', subjectEn: 'Day 1 Schedule Created',
+      bodyDe: '{{Details}}',
+      bodyEn: '{{Details}}'
+    },
+    day2ScheduleCreated: {
+      subjectDe: 'Tag-2-Zeitplan erstellt', subjectEn: 'Day 2 Schedule Created',
       bodyDe: '{{Details}}',
       bodyEn: '{{Details}}'
     },
@@ -764,10 +799,13 @@ var CONFIG = {
     { key: 'scheduleDeleted', label: 'Schedule Deleted' },
     { key: 'bloodDrawingSlotCreated', label: 'Blood Drawing Slot Created' },
     { key: 'bloodDrawingSlotUpdated', label: 'Blood Drawing Slot Updated' },
+    { key: 'bloodDrawingSlotBooked', label: 'Blood Drawing Slot Booked' },
+    { key: 'bloodDrawingSlotUnbooked', label: 'Blood Drawing Slot Unbooked' },
     { key: 'bloodDrawingSlotDeleted', label: 'Blood Drawing Slot Deleted' },
     { key: 'participantBooking', label: 'Participant Booking' },
     { key: 'bookingRescheduled', label: 'Booking Rescheduled' },
     { key: 'bookingCancelled', label: 'Booking Cancelled' },
+    { key: 'adminBookingUnbooked', label: 'Admin Unbooking' },
     { key: 'staffAssignment', label: 'Staff Assignment' },
     { key: 'staffReassignment', label: 'Staff Reassignment' }
   ],
@@ -792,10 +830,13 @@ var CONFIG = {
     scheduleDeleted: [],
     bloodDrawingSlotCreated: ['BloodDrawingStaff', 'TechnicalAssistants'],
     bloodDrawingSlotUpdated: ['BloodDrawingStaff', 'TechnicalAssistants'],
+    bloodDrawingSlotBooked: ['BloodDrawingStaff', 'TechnicalAssistants', 'Participant'],
+    bloodDrawingSlotUnbooked: ['BloodDrawingStaff', 'TechnicalAssistants'],
     bloodDrawingSlotDeleted: [],
     participantBooking: ['AssignedStaff', 'Participant'],
     bookingRescheduled: ['AssignedStaff', 'Participant'],
     bookingCancelled: [],
+    adminBookingUnbooked: ['AssignedStaff'],
     staffAssignment: ['AssignedStaff'],
     staffReassignment: ['AssignedStaff']
   },
@@ -1441,6 +1482,24 @@ function formatDateForDisplay_(value, lang) {
     return weekday + ', ' + day + '. ' + month + ' ' + year;
   }
   return weekday + ', ' + month + ' ' + day + ', ' + year;
+}
+
+/** Numeric date for emails / audits: always dd.mm.yyyy */
+function formatDateNumeric_(value) {
+  var d = value;
+  if (Object.prototype.toString.call(value) !== '[object Date]') {
+    d = parseDateInput_(value);
+  }
+  if (!d || Object.prototype.toString.call(d) !== '[object Date]') return value ? String(value) : '';
+  return pad2_(d.getDate()) + '.' + pad2_(d.getMonth() + 1) + '.' + d.getFullYear();
+}
+
+/** Slot date+time line for emails: "dd.mm.yyyy HH:MM–HH:MM" */
+function formatSlotDateTimeForEmail_(dateVal, startVal, endVal) {
+  var datePart = formatDateNumeric_(dateVal);
+  var startPart = formatTimeForDisplay_(startVal, 'de');
+  var endPart = endVal != null ? formatTimeForDisplay_(endVal, 'de') : '';
+  return datePart + (startPart ? (' ' + startPart) : '') + (endPart ? ('\u2013' + endPart) : '');
 }
 
 function formatTimeForDisplay_(value, lang) {
@@ -4098,9 +4157,10 @@ function validateBehaviouralSlot_(c) {
     durationMinutes: c.durationMinutes,
     staffEmail: c.staffEmail,
     excludeSlotIDs: {
-      Day1: candidateType === 'Day1' ? (c.excludeSlotID || null) : null,
-      Day2: candidateType === 'Day2' ? (c.excludeSlotID || null) : null,
-      MRI: c.excludeMriSlotID || null
+      Day1: candidateType === 'Day1' ? (c.excludeSlotID || null) : (c.excludeDay1SlotID || null),
+      Day2: candidateType === 'Day2' ? (c.excludeSlotID || null) : (c.excludeDay2SlotID || null),
+      MRI: c.excludeMriSlotID || null,
+      BloodDrawing: c.excludeBloodDrawingSlotID || null
     },
     label: c.label
   });
@@ -4110,6 +4170,23 @@ function validateBehaviouralSlot_(c) {
   });
   result.mriOverlaps = result.conflicts.filter(function (o) { return o.day === 'MRI'; });
   return result;
+}
+
+/**
+ * Same-schedule exclusions for a Day 1 slot: never treat its linked MRI or
+ * Blood Drawing slot as a conflict against itself (they belong together).
+ */
+function sameScheduleExclusionsForDay1_(day1SlotID) {
+  var excl = { Day1: day1SlotID || null, Day2: null, MRI: null, BloodDrawing: null };
+  if (!day1SlotID) return excl;
+  var d1 = getSlotByFullRow_(CONFIG.SHEETS.DAY1, day1SlotID);
+  if (d1) {
+    var mriId = String(d1.values[CONFIG.DAY1_EXTRA_COLS.MRI_SLOT_ID] || '');
+    if (mriId) excl.MRI = mriId;
+  }
+  var bd = findBloodDrawingRowByDay1SlotID_(day1SlotID);
+  if (bd) excl.BloodDrawing = String(bd.values[CONFIG.BLOOD_DRAWING_COLS.SLOT_ID]);
+  return excl;
 }
 
 /** Returns the Day 1 + Day 2 staff emails recorded on an MRI slot (deduplicated, blanks dropped). */
@@ -4330,7 +4407,7 @@ function notifyMainAdminCalendarEventDeleted_(summaryLine, actionRecipients) {
   }
 }
 
-function notifyAdminOfChange_(action, detailLines, subjectKey) {
+function notifyAdminOfChange_(action, detailLines, subjectKey, recipientContext) {
   try {
     var details = (detailLines || []).join('\n');
 
@@ -4342,8 +4419,12 @@ function notifyAdminOfChange_(action, detailLines, subjectKey) {
     // Calls with no subjectKey (pure admin-account audit notices — password
     // reset, account created/removed, role changed) keep going to all
     // admins, since those aren't part of the configurable event catalog.
+    // recipientContext lets callers include AssignedStaff / BD staff / TAs
+    // so matrix groups other than MainAdmin actually resolve.
     var isConfiguredEvent = subjectKey && CONFIG.NOTIFICATION_EVENTS.some(function (e) { return e.key === subjectKey; });
-    var recipients = isConfiguredEvent ? resolveNotificationRecipients_(subjectKey, {}) : getAllAdminEmails_();
+    var recipients = isConfiguredEvent
+      ? resolveNotificationRecipients_(subjectKey, recipientContext || {})
+      : getAllAdminEmails_();
 
     // Bug fix: an empty recipient list for a CONFIGURED event means the Main
     // Admin deliberately routed that event to nobody (e.g. unchecked every
@@ -4947,7 +5028,27 @@ function getDay1DeletionImpact_(day1SlotID) {
       mriSlotID: String(day1Record.values[CONFIG.DAY1_EXTRA_COLS.MRI_SLOT_ID] || '')
     },
     orphanedDay2: orphaned,
-    linkedBloodDrawing: linkedBloodDrawing
+    linkedBloodDrawing: linkedBloodDrawing,
+    // Selectable related slots for the deletion confirmation picker
+    related: (function () {
+      var list = [];
+      orphaned.forEach(function (d2) {
+        list.push({ kind: 'day2', slotID: d2.slotID, label: 'Day 2 ' + d2.slotID + ' (' + d2.date + ' ' + d2.startTime + ')', defaultChecked: true });
+      });
+      linkedBloodDrawing.forEach(function (bd) {
+        list.push({
+          kind: 'bloodDrawing',
+          slotID: bd.slotID,
+          label: 'Blood Drawing ' + bd.slotID + ' (' + bd.date + ' ' + bd.startTime + ')' + (bd.booked ? ' — booked' : ''),
+          defaultChecked: false
+        });
+      });
+      var mriId = String(day1Record.values[CONFIG.DAY1_EXTRA_COLS.MRI_SLOT_ID] || '');
+      if (mriId) {
+        list.push({ kind: 'mri', slotID: mriId, label: 'MRI ' + mriId + ' (delete; unchecked = return to Available)', defaultChecked: false });
+      }
+      return list;
+    })()
   };
 }
 
@@ -5134,7 +5235,7 @@ function editDay2Slot(token, day2SlotID, data) {
   return { success: true, message: 'Day 2 slot ' + day2SlotID + ' updated.' };
 }
 
-function deleteDay1Slot(token, day1SlotID, confirmDeleteOrphans) {
+function deleteDay1Slot(token, day1SlotID, confirmDeleteOrphans, selectedRelated) {
   var session = requireAdminAuth_(token);
   requirePermission_(session, 'manage_slots');
 
@@ -5143,25 +5244,33 @@ function deleteDay1Slot(token, day1SlotID, confirmDeleteOrphans) {
     return { success: false, message: impact.error };
   }
 
-  // Round 11: the confirmation preview now fires whenever ANY cascade
-  // deletion would happen — Day 2 orphans OR linked Blood Drawing slots —
-  // not just Day 2 orphans, so the admin always sees the full blast radius
-  // before it happens instead of discovering it only when it involved
-  // orphaned Day 2 slots specifically.
-  var hasCascadeImpact = impact.orphanedDay2.length > 0 || impact.linkedBloodDrawing.length > 0;
-  if (hasCascadeImpact && !confirmDeleteOrphans) {
-    var parts = [];
-    if (impact.orphanedDay2.length) parts.push(impact.orphanedDay2.length + ' Day 2 slot(s) with no other compatible Day 1 slot');
-    if (impact.linkedBloodDrawing.length) parts.push(impact.linkedBloodDrawing.length + ' linked Blood Drawing slot(s)');
+  // Always show a related-slot picker when there is anything related
+  // (orphaned Day 2, linked BD, or MRI) — BD is NOT auto-deleted.
+  var hasRelated = (impact.related && impact.related.length > 0);
+  if (hasRelated && !confirmDeleteOrphans) {
     return {
       success: false,
       requiresConfirmation: true,
       day1: impact.day1,
       orphanedDay2: impact.orphanedDay2,
       linkedBloodDrawing: impact.linkedBloodDrawing,
-      message: 'Deleting Day 1 slot ' + day1SlotID + ' will also delete ' + parts.join(' and ') + '.' +
-        (impact.day1.mriSlotID ? ' Its linked MRI slot ' + impact.day1.mriSlotID + ' will be returned to Available (not deleted).' : '')
+      related: impact.related,
+      message: 'Select which related slots to also delete with Day 1 slot ' + day1SlotID +
+        '. Unchecked Blood Drawing slots are kept (Day 1 link cleared). Unchecked MRI is returned to Available.'
     };
+  }
+
+  selectedRelated = selectedRelated || {};
+  var selectedDay2 = {};
+  var selectedBd = {};
+  var deleteMri = !!selectedRelated.mri;
+  (selectedRelated.day2Ids || []).forEach(function (id) { selectedDay2[String(id)] = true; });
+  (selectedRelated.bloodDrawingIds || []).forEach(function (id) { selectedBd[String(id)] = true; });
+  // If the admin confirmed without sending an explicit selection list (legacy
+  // "Delete Anyway"), default: delete orphaned Day2, keep BD, release MRI.
+  if (confirmDeleteOrphans && !selectedRelated.day2Ids && !selectedRelated.bloodDrawingIds && selectedRelated.mri == null) {
+    impact.orphanedDay2.forEach(function (d2) { selectedDay2[d2.slotID] = true; });
+    deleteMri = false;
   }
 
   var day1CalEventId = '';
@@ -5173,6 +5282,7 @@ function deleteDay1Slot(token, day1SlotID, confirmDeleteOrphans) {
     if (d1Staff) affectedStaff.push(d1Staff);
   }
   impact.orphanedDay2.forEach(function (d2) {
+    if (!selectedDay2[d2.slotID]) return;
     var rec = getSlotByFullRow_(CONFIG.SHEETS.DAY2, d2.slotID);
     if (!rec) return;
     var s = String(rec.values[CONFIG.DAY2_EXTRA_COLS.ASSIGNED_STAFF] || '');
@@ -5186,29 +5296,52 @@ function deleteDay1Slot(token, day1SlotID, confirmDeleteOrphans) {
 
   deleteSlotRow_(CONFIG.SHEETS.DAY1, day1SlotID);
   deleteStaffCalendarEvent_(day1CalEventId);
-  cleanUpLinkedBloodDrawingSlots_(day1SlotID);
+
+  // Blood Drawing: delete only selected; otherwise detach Day 1 link.
+  var bdCols = CONFIG.BLOOD_DRAWING_COLS;
+  impact.linkedBloodDrawing.forEach(function (bd) {
+    if (selectedBd[bd.slotID]) {
+      cleanUpSpecificBloodDrawingSlot_(bd.slotID, day1SlotID);
+    } else {
+      var bdRec = findBloodDrawingRow_(bd.slotID);
+      if (bdRec) {
+        bdRec.sheet.getRange(bdRec.rowIndex, bdCols.DAY1_SLOT_ID + 1).setValue('');
+      }
+    }
+  });
+
   var deletedDay2Ids = [];
-  // Delete bottom-up isn't needed here since each deleteSlotRow_ call
-  // re-locates its own row fresh via findSlotRow_ before deleting.
   impact.orphanedDay2.forEach(function (d2, idx) {
+    if (!selectedDay2[d2.slotID]) return;
     if (deleteSlotRow_(CONFIG.SHEETS.DAY2, d2.slotID)) {
       deletedDay2Ids.push(d2.slotID);
       deleteStaffCalendarEvent_(orphanCalEventIds[idx]);
     }
   });
 
-  var mriReleased = releaseLinkedMriSlot_(impact.day1.mriSlotID);
+  var mriNote = '(none)';
+  if (impact.day1.mriSlotID) {
+    if (deleteMri) {
+      var mriRec = getSlotByFullRow_(CONFIG.SHEETS.MRI, impact.day1.mriSlotID);
+      if (mriRec) {
+        var mriCalId = String(mriRec.values[CONFIG.MRI_EXTRA_COLS.CALENDAR_EVENT_ID] || '');
+        deleteSlotRow_(CONFIG.SHEETS.MRI, impact.day1.mriSlotID);
+        if (mriCalId) deleteStaffCalendarEvent_(mriCalId);
+      }
+      mriNote = impact.day1.mriSlotID + ' (deleted)';
+    } else {
+      var mriReleased = releaseLinkedMriSlot_(impact.day1.mriSlotID);
+      mriNote = impact.day1.mriSlotID + (mriReleased ? ' (returned to Available)' : '');
+    }
+  }
 
-  // Requirement #10: the notification must name the deleted Day 1 slot, the
-  // affected Day 2 slot(s), the linked MRI slot, and who deleted it —
-  // never leave any of those blank.
   var day1DeletedNotifyRecipients = resolveNotificationRecipients_('day1SlotDeleted', { assignedStaff: affectedStaff });
   notifyScheduleDeleted_(
     [
       'Day 1 slot ' + day1SlotID + ' has been deleted.',
       '',
       'Day 2: ' + (deletedDay2Ids.length ? deletedDay2Ids.join(', ') : '(none affected)'),
-      'MRI: ' + (impact.day1.mriSlotID ? (impact.day1.mriSlotID + (mriReleased ? ' (returned to Available)' : '')) : '(none)'),
+      'MRI: ' + mriNote,
       'Deleted by: ' + session.name
     ],
     affectedStaff,
@@ -5267,8 +5400,9 @@ function deleteDay2Slot(token, day2SlotID, confirmCascade) {
   var day2Staff = String(record.values[CONFIG.DAY2_EXTRA_COLS.ASSIGNED_STAFF] || '');
   if (day2Staff) affectedStaff.push(day2Staff);
 
-  // Cascade-delete the affected Day 1 slots (+ their linked Blood Drawing
-  // slots and calendar events) first.
+  // Cascade-delete the affected Day 1 slots (+ optional linked Blood Drawing
+  // slots and calendar events) first. Always release linked MRI slots so they
+  // return to Available when their Day 1 schedule is removed.
   var cascadedDay1 = [];
   impact.affectedDay1.forEach(function (d1) {
     var d1Rec = getSlotByFullRow_(CONFIG.SHEETS.DAY1, d1.slotID);
@@ -5276,9 +5410,15 @@ function deleteDay2Slot(token, day2SlotID, confirmCascade) {
     var d1CalEventId = String(d1Rec.values[CONFIG.DAY1_EXTRA_COLS.CALENDAR_EVENT_ID] || '');
     var d1Staff = String(d1Rec.values[CONFIG.DAY1_EXTRA_COLS.ASSIGNED_STAFF] || '');
     if (d1Staff && affectedStaff.indexOf(d1Staff) === -1) affectedStaff.push(d1Staff);
+    var mriId = String(d1Rec.values[CONFIG.DAY1_EXTRA_COLS.MRI_SLOT_ID] || '');
     deleteSlotRow_(CONFIG.SHEETS.DAY1, d1.slotID);
     deleteStaffCalendarEvent_(d1CalEventId);
-    cleanUpLinkedBloodDrawingSlots_(d1.slotID); // removes BD slots + notifies BD staff/TAs (round 4, #6)
+    // Detach BD by default on Day2 cascade (do not auto-delete); clear Day1 link.
+    var bd = findBloodDrawingRowByDay1SlotID_(d1.slotID);
+    if (bd) {
+      bd.sheet.getRange(bd.rowIndex, CONFIG.BLOOD_DRAWING_COLS.DAY1_SLOT_ID + 1).setValue('');
+    }
+    releaseLinkedMriSlot_(mriId);
     cascadedDay1.push(d1.slotID);
   });
 
@@ -5360,7 +5500,10 @@ function findBookingsByDay1Slot_(day1SlotID) {
   var sheet = getSheet_(CONFIG.SHEETS.BOOKINGS);
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
-  var values = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+  // Must read the FULL booking row width — confirmation number is column index 6
+  // (previously capped at 6 columns → Booking ID always blank in unbook emails).
+  var width = CONFIG.BOOKING_ROW_WIDTH;
+  var values = sheet.getRange(2, 1, lastRow - 1, width).getValues();
   var col = CONFIG.BOOKING_COLS.DAY1_SLOT_ID;
   var matches = [];
   for (var i = 0; i < values.length; i++) {
@@ -5384,13 +5527,95 @@ function findBookingsByDay1Slot_(day1SlotID) {
  * @param {string} action - 'unbook' | 'delete'
  * @return {Object}
  */
-function handleBookedDay1Slot(token, day1SlotID, action) {
+/**
+ * Preview related slots that would be affected by Unbook / Delete Completely
+ * on a booked Day 1 slot — used by the admin confirmation picker.
+ */
+function getBookedDay1ActionPreview(token, day1SlotID) {
+  var session = requireAdminAuth_(token);
+  requirePermission_(session, 'manage_slots');
+
+  var cols = CONFIG.SLOT_COLS;
+  var bcols = CONFIG.BOOKING_COLS;
+  var day1Record = getSlotByFullRow_(CONFIG.SHEETS.DAY1, day1SlotID);
+  if (!day1Record) return { success: false, message: 'That Day 1 slot no longer exists.' };
+  if (!isBooked_(day1Record.values[cols.BOOKED])) {
+    return { success: false, message: 'That Day 1 slot is not booked.' };
+  }
+
+  var bookings = findBookingsByDay1Slot_(day1SlotID);
+  var booking = bookings[0];
+  var bookingID = booking ? String(booking.values[bcols.CONFIRMATION_NUMBER] || '') : '';
+  var participantName = booking ? String(booking.values[bcols.NAME] || '') : '';
+  var day2SlotID = booking ? String(booking.values[bcols.DAY2_SLOT_ID] || '').trim() : '';
+  var mriSlotID = String(day1Record.values[CONFIG.DAY1_EXTRA_COLS.MRI_SLOT_ID] || '');
+  var staffEmail = String(day1Record.values[CONFIG.DAY1_EXTRA_COLS.ASSIGNED_STAFF] || '');
+
+  var related = [];
+  related.push({
+    kind: 'day1',
+    slotID: day1SlotID,
+    label: 'Day 1 ' + day1SlotID + ' (' + formatDateNumeric_(day1Record.values[cols.DATE]) + ' ' +
+      formatTimeForDisplay_(day1Record.values[cols.START_TIME], 'en') + ')',
+    required: true,
+    defaultChecked: true
+  });
+  if (day2SlotID) {
+    var d2 = getSlotByFullRow_(CONFIG.SHEETS.DAY2, day2SlotID);
+    related.push({
+      kind: 'day2',
+      slotID: day2SlotID,
+      label: 'Day 2 ' + day2SlotID + (d2 ? (' (' + formatDateNumeric_(d2.values[cols.DATE]) + ' ' +
+        formatTimeForDisplay_(d2.values[cols.START_TIME], 'en') + ')') : ''),
+      required: false,
+      defaultChecked: true
+    });
+  }
+  var bd = findBloodDrawingRowByDay1SlotID_(day1SlotID);
+  if (bd) {
+    var bdCols = CONFIG.BLOOD_DRAWING_COLS;
+    related.push({
+      kind: 'bloodDrawing',
+      slotID: String(bd.values[bdCols.SLOT_ID]),
+      label: 'Blood Drawing ' + bd.values[bdCols.SLOT_ID] + ' (' +
+        formatDateNumeric_(bd.values[bdCols.DATE]) + ' ' +
+        formatTimeForDisplay_(bd.values[bdCols.START_TIME], 'en') + ')',
+      required: false,
+      defaultChecked: true
+    });
+  }
+  if (mriSlotID) {
+    related.push({
+      kind: 'mri',
+      slotID: mriSlotID,
+      label: 'MRI ' + mriSlotID + ' (delete completely only — unbook leaves MRI as-is)',
+      required: false,
+      defaultChecked: false,
+      deleteOnly: true
+    });
+  }
+
+  return {
+    success: true,
+    day1SlotID: day1SlotID,
+    bookingID: bookingID,
+    participantName: participantName,
+    assignedStaff: staffEmail,
+    related: related
+  };
+}
+
+function handleBookedDay1Slot(token, day1SlotID, action, options) {
   var session = requireAdminAuth_(token);
   requirePermission_(session, 'manage_slots');
 
   if (action !== 'unbook' && action !== 'delete') {
     return { success: false, message: 'Unknown action.' };
   }
+  options = options || {};
+  // selectedKinds: which related slot kinds to also clear/delete
+  // e.g. { day2: true, bloodDrawing: true, mri: false }
+  var selected = options.selectedKinds || { day2: true, bloodDrawing: true, mri: false };
 
   var cols = CONFIG.SLOT_COLS;
   var bcols = CONFIG.BOOKING_COLS;
@@ -5419,9 +5644,26 @@ function handleBookedDay1Slot(token, day1SlotID, action) {
     var participantEmail = booking.values[bcols.EMAIL];
     var bookingID = String(booking.values[bcols.CONFIRMATION_NUMBER] || '');
     var mriSlotIDForSummary = String(day1Record.values[CONFIG.DAY1_EXTRA_COLS.MRI_SLOT_ID] || '');
+    var day1Staff = String(day1Record.values[CONFIG.DAY1_EXTRA_COLS.ASSIGNED_STAFF] || '');
+    var day2Staff = '';
+    if (day2SlotID) {
+      var d2StaffRec = getSlotByFullRow_(CONFIG.SHEETS.DAY2, day2SlotID);
+      if (d2StaffRec) day2Staff = String(d2StaffRec.values[CONFIG.DAY2_EXTRA_COLS.ASSIGNED_STAFF] || '');
+    }
+    var bdRec = findBloodDrawingRowByDay1SlotID_(day1SlotID);
+    var bdStaff = '';
+    var bdTAs = [];
+    if (bdRec) {
+      bdStaff = String(bdRec.values[CONFIG.BLOOD_DRAWING_COLS.ASSIGNED_STAFF] || '');
+      bdTAs = parseTaEmails_(bdRec.values[CONFIG.BLOOD_DRAWING_COLS.ASSIGNED_TA]);
+    }
+    var assignedStaffEmails = [];
+    if (day1Staff) assignedStaffEmails.push(day1Staff);
+    if (day2Staff && assignedStaffEmails.indexOf(day2Staff) === -1) assignedStaffEmails.push(day2Staff);
 
+    // Avoid Outlook auto-hyperlinking "Booking ID" — use "Confirmation number".
     var summaryLines = [
-      'Booking ID: ' + (bookingID || '(none)'),
+      'Confirmation number: ' + (bookingID || '(none)'),
       'Day 1 slot: ' + day1SlotID,
       'Day 2 slot: ' + (day2SlotID || '(not found)'),
       'MRI slot: ' + (mriSlotIDForSummary || '(none)'),
@@ -5429,8 +5671,6 @@ function handleBookedDay1Slot(token, day1SlotID, action) {
       'Actioned by: ' + session.name
     ];
 
-    // Remove this booking's events from the participant calendar (applies to
-    // both 'unbook' and 'delete' — either way the booking no longer exists).
     var d1StartForCal = combineDateAndTime_(day1Record.values[cols.DATE], day1Record.values[cols.START_TIME]);
     var d2StartForCal = null;
     if (day2SlotID) {
@@ -5441,17 +5681,11 @@ function handleBookedDay1Slot(token, day1SlotID, action) {
     }
     deleteParticipantCalendarEvents_(day1SlotID, day2SlotID, d1StartForCal, d2StartForCal);
 
-    // Round 5, #5: soft-delete the Bookings row(s) — preserved for audit,
-    // excluded from normal views. (Only the permanent 'delete' action marks
-    // them Deleted; 'unbook' returns the slots to Available below without
-    // removing the booking history — handled by its own status logic.)
     if (action === 'delete') {
       bookings.forEach(function (b) {
         softDeleteRowIndex_(CONFIG.SHEETS.BOOKINGS, b.rowIndex, session.email, 'Booking deleted');
       });
     } else {
-      // 'unbook': mark the booking row Cancelled (existing behaviour), keeping
-      // the row. Physical removal is never used.
       bookings.forEach(function (b) {
         getSheet_(CONFIG.SHEETS.BOOKINGS).getRange(b.rowIndex, CONFIG.BOOKING_COLS.STATUS + 1).setValue('Cancelled');
       });
@@ -5459,28 +5693,45 @@ function handleBookedDay1Slot(token, day1SlotID, action) {
 
     if (action === 'unbook') {
       day1Record.sheet.getRange(day1Record.rowIndex, cols.BOOKED + 1).setValue(false);
-      if (day2SlotID) {
+      if (day2SlotID && selected.day2 !== false) {
         var day2Record = getSlotByFullRow_(CONFIG.SHEETS.DAY2, day2SlotID);
         if (day2Record) {
           day2Record.sheet.getRange(day2Record.rowIndex, cols.BOOKED + 1).setValue(false);
         }
       }
-      // Requirement #12: returning a booking to Available also clears the
-      // linked Blood Drawing slot's Booking ID/participant tie-in.
-      unlinkBloodDrawingFromBooking_(day1SlotID);
+      if (selected.bloodDrawing !== false) {
+        unlinkBloodDrawingFromBooking_(day1SlotID);
+      }
 
-      // Requirement #11: the notification's opening line must literally
-      // name the Booking ID — never blank.
-      var unbookOpeningLine = 'Booking ID ' + (bookingID || '(none)') + ' has been removed from the schedule.';
-      notifyAdminOfChange_('Booking removed (slots returned to Available)', [unbookOpeningLine, ''].concat(summaryLines), 'bookingUnbooked');
+      var unbookOpeningLine = 'Confirmation number ' + (bookingID || '(none)') + ' has been removed from the schedule.';
+      notifyAdminOfChange_(
+        'Booking removed (slots returned to Available)',
+        [unbookOpeningLine, ''].concat(summaryLines),
+        'adminBookingUnbooked',
+        {
+          assignedStaff: assignedStaffEmails,
+          bloodDrawingStaff: bdStaff ? [bdStaff] : [],
+          technicalAssistants: bdTAs,
+          participants: participantEmail ? [String(participantEmail)] : []
+        }
+      );
       return {
         success: true,
-        message: 'Booking removed. Day 1 slot ' + day1SlotID + (day2SlotID ? ' and Day 2 slot ' + day2SlotID : '') + ' are available again.'
+        message: 'Booking removed. Day 1 slot ' + day1SlotID +
+          (day2SlotID && selected.day2 !== false ? ' and Day 2 slot ' + day2SlotID : '') +
+          ' are available again.'
       };
     }
 
-    // action === 'delete': remove the slots entirely.
-    unlinkBloodDrawingFromBooking_(day1SlotID);
+    // action === 'delete': remove the slots entirely (honour selected related kinds).
+    if (selected.bloodDrawing !== false) {
+      unlinkBloodDrawingFromBooking_(day1SlotID, { suppressNotification: true });
+      cleanUpLinkedBloodDrawingSlots_(day1SlotID);
+    } else if (bdRec) {
+      // Detach without deleting: clear Day 1 link + booking fields.
+      unlinkBloodDrawingFromBooking_(day1SlotID, { suppressNotification: true });
+      bdRec.sheet.getRange(bdRec.rowIndex, CONFIG.BLOOD_DRAWING_COLS.DAY1_SLOT_ID + 1).setValue('');
+    }
     var mriSlotID = String(day1Record.values[CONFIG.DAY1_EXTRA_COLS.MRI_SLOT_ID] || '');
     var day1CalEventId = String(day1Record.values[CONFIG.DAY1_EXTRA_COLS.CALENDAR_EVENT_ID] || '');
     var day2CalEventId = '';
@@ -5490,21 +5741,44 @@ function handleBookedDay1Slot(token, day1SlotID, action) {
     }
     deleteSlotRow_(CONFIG.SHEETS.DAY1, day1SlotID);
     deleteStaffCalendarEvent_(day1CalEventId);
-    if (day2SlotID) {
+    if (day2SlotID && selected.day2 !== false) {
       deleteSlotRow_(CONFIG.SHEETS.DAY2, day2SlotID);
       deleteStaffCalendarEvent_(day2CalEventId);
     }
-    var mriReleased = releaseLinkedMriSlot_(mriSlotID);
-    if (mriReleased) summaryLines.push('Linked MRI slot ' + mriSlotID + ' returned to Available.');
-    var deleteOpeningLine = 'Booking ID ' + (bookingID || '(none)') + ' and its slots have been permanently deleted.';
-    var scheduleDeletedRecipients = resolveNotificationRecipients_('scheduleDeleted', {});
-    notifyAdminOfChange_('Booking and slots permanently deleted', [deleteOpeningLine, ''].concat(summaryLines), 'scheduleDeleted');
+    if (mriSlotID && selected.mri === true) {
+      var mriRec = getSlotByFullRow_(CONFIG.SHEETS.MRI, mriSlotID);
+      if (mriRec) {
+        var mriCalId = String(mriRec.values[CONFIG.MRI_EXTRA_COLS.CALENDAR_EVENT_ID] || '');
+        deleteSlotRow_(CONFIG.SHEETS.MRI, mriSlotID);
+        if (mriCalId) deleteStaffCalendarEvent_(mriCalId);
+      }
+      summaryLines.push('Linked MRI slot ' + mriSlotID + ' deleted.');
+    } else {
+      var mriReleased = releaseLinkedMriSlot_(mriSlotID);
+      if (mriReleased) summaryLines.push('Linked MRI slot ' + mriSlotID + ' returned to Available.');
+    }
+    var deleteOpeningLine = 'Confirmation number ' + (bookingID || '(none)') + ' and its slots have been permanently deleted.';
+    var scheduleDeletedRecipients = resolveNotificationRecipients_('scheduleDeleted', {
+      assignedStaff: assignedStaffEmails,
+      bloodDrawingStaff: bdStaff ? [bdStaff] : [],
+      technicalAssistants: bdTAs
+    });
+    notifyAdminOfChange_(
+      'Booking and slots permanently deleted',
+      [deleteOpeningLine, ''].concat(summaryLines),
+      'scheduleDeleted',
+      {
+        assignedStaff: assignedStaffEmails,
+        bloodDrawingStaff: bdStaff ? [bdStaff] : [],
+        technicalAssistants: bdTAs
+      }
+    );
     if (day1CalEventId || day2CalEventId) {
       notifyMainAdminCalendarEventDeleted_('Day 1 slot ' + day1SlotID + (day2SlotID ? ' / Day 2 slot ' + day2SlotID : ''), scheduleDeletedRecipients);
     }
     return {
       success: true,
-      message: 'Permanently deleted Day 1 slot ' + day1SlotID + (day2SlotID ? ', Day 2 slot ' + day2SlotID : '') + ', and the booking record.'
+      message: 'Permanently deleted Day 1 slot ' + day1SlotID + (day2SlotID && selected.day2 !== false ? ', Day 2 slot ' + day2SlotID : '') + ', and the booking record.'
     };
 
   } finally {
@@ -5563,8 +5837,9 @@ function getApprovedStaffList_() {
     if (seen[key]) return;
     seen[key] = true;
     out.push({
-      name: String(r.values[acols.NAME] || email) + ' (' + String(r.values[acols.ROLE]) + ')',
+      name: String(r.values[acols.NAME] || email),
       email: email,
+      role: String(r.values[acols.ROLE] || ''),
       isAdmin: true
     });
   });
@@ -6012,25 +6287,265 @@ function getDay2SlotsInWindowForAdmin(token, day1DateStr, day1StartStr, day1Dura
 function getIndependentDay2Options(token, candidate) {
   var session = requireAdminAuth_(token);
   requirePermission_(session, 'manage_slots');
+  return getIndependentDay2OptionsForSession_(session, candidate);
+}
 
+/**
+ * Client-callable: creates the independent Day 2 slot after the admin has
+ * reviewed the compatible Day 1 option(s) and picked a staff member.
+ * Re-validates everything inside a lock (authoritative, never trusts the
+ * client-side preview).
+ * @param {string} token
+ * @param {Object} data - {date, startTime, durationMinutes, staffEmail}
+ * @return {Object}
+ */
+function createIndependentDay2Slot(token, data) {
+  var session = requireAdminAuth_(token);
+  requirePermission_(session, 'manage_slots');
+  return createIndependentDay2SlotInternal_(session, data || {});
+}
+
+/**
+ * Shared create path for independent Day 2 (single + bulk). Pass
+ * suppressNotification:true from bulk so the batch sender consolidates mail.
+ * Does NOT send the "New Schedule Created" (scheduleCreated) event — that is
+ * reserved for MRI→Day1→Day2 schedule pushes, not standalone Day 2 rows.
+ */
+function createIndependentDay2SlotInternal_(session, data) {
+  var staffEmail = String((data && data.staffEmail) || '').trim().toLowerCase();
+  if (!staffEmail) return { success: false, message: 'Please select an assigned staff member.' };
+  var staffMatch = getApprovedStaffList_().some(function (s) { return s.email.toLowerCase() === staffEmail; });
+  if (!staffMatch) return { success: false, message: 'That staff member was not found in the Staff sheet.' };
+
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
+  } catch (lockError) {
+    return { success: false, message: 'The system is busy. Please try again in a moment.' };
+  }
+
+  try {
+    var options = getIndependentDay2OptionsForSession_(session, data);
+    if (!options.success) return options;
+
+    var parsed = validateSlotInputWithDuration_(data);
+    if (parsed.error) return { success: false, message: parsed.error };
+
+    var indepValidation = validateBehaviouralSlot_({
+      dateStr: data.date,
+      startTimeStr: data.startTime,
+      durationMinutes: data.durationMinutes,
+      staffEmail: staffEmail,
+      excludeSlotID: null,
+      excludeMriSlotID: null,
+      label: 'This Day 2 slot'
+    });
+    if (indepValidation.errors.length) {
+      return {
+        success: false,
+        errors: indepValidation.errors,
+        warnings: indepValidation.warnings,
+        conflicts: describeBehaviouralOverlaps_(indepValidation.behaviouralConflicts),
+        message: indepValidation.errors.join('\n')
+      };
+    }
+
+    var slotId = generateNextSlotId_(CONFIG.SHEETS.DAY2, 'D2');
+    var startDT = combineDateAndTime_(parsed.date, parsed.start);
+    var endDT = combineDateAndTime_(parsed.date, parsed.end);
+    var eventId = upsertStaffCalendarEvent_(
+      'Day 2 — ' + CONFIG.EXPERIMENT_NAME.en + ' (' + slotId + ')', startDT, endDT, staffEmail, '', 'day2ScheduleCreated'
+    );
+
+    getSheet_(CONFIG.SHEETS.DAY2).appendRow([slotId, parsed.date, parsed.start, parsed.end, false, staffEmail, eventId, createdByLegacy_(session), new Date(), normalizeSlotLanguage_(data.language)]);
+
+    var summary = slotId + ' (' + data.date + ' ' + data.startTime + '\u2013' + parsed.endTimeStr + ')';
+    var compatibleSummary = options.compatibleDay1.map(function (d1) {
+      return d1.slotID + ' (' + d1.date + ' ' + d1.startTime + ')';
+    }).join(', ');
+
+    if (!data.suppressNotification) {
+      // Staff assignment only — intentionally NOT scheduleCreated / "New Schedule Created".
+      sendStaffAssignmentEmails_(
+        null,
+        { staffEmail: staffEmail, details: 'Day 2 slot ' + summary + ' — ' + CONFIG.LOCATION.address }
+      );
+    }
+
+    return {
+      success: true,
+      message: 'Day 2 slot created successfully.',
+      slotID: slotId,
+      summary: summary,
+      staffEmail: staffEmail,
+      compatibleDay1: options.compatibleDay1,
+      compatibleSummary: compatibleSummary,
+      addedSummary: { day2: summary, staff: staffEmail, compatibleDay1: options.compatibleDay1 }
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Client-callable (manage_slots): create several independent Day 2 slots
+ * as one all-or-nothing batch. Validates every row against:
+ *   (1) slots already saved,
+ *   (2) other rows in this same batch,
+ *   (3) the Scheduling Rules matrix (via validateSchedulingSlot_),
+ * then creates only if every row is valid. Sends ONE consolidated staff
+ * email — never the "New Schedule Created" notification.
+ */
+function bulkCreateIndependentDay2Slots(token, candidates) {
+  var session = requireAdminAuth_(token);
+  requirePermission_(session, 'manage_slots');
+
+  if (!candidates || !candidates.length) {
+    return { success: false, message: 'Add at least one Day 2 slot first.' };
+  }
+
+  var results = [];
+  var prepared = [];
+
+  for (var i = 0; i < candidates.length; i++) {
+    var c = candidates[i] || {};
+    var staffEmail = String(c.staffEmail || '').trim().toLowerCase();
+    var label = 'Day 2 row #' + (i + 1);
+
+    if (!c.date || !c.startTime || !c.durationMinutes || !staffEmail) {
+      results.push({ success: false, input: c, message: label + ': fill in date, start time, duration, and assigned staff.' });
+      continue;
+    }
+
+    var options = getIndependentDay2OptionsForSession_(session, c);
+    if (!options.success) {
+      results.push({ success: false, input: c, message: options.message || (label + ' failed validation.') });
+      continue;
+    }
+
+    var validation = validateBehaviouralSlot_({
+      dateStr: c.date,
+      startTimeStr: c.startTime,
+      durationMinutes: c.durationMinutes,
+      staffEmail: staffEmail,
+      excludeSlotID: null,
+      excludeMriSlotID: null,
+      label: label
+    });
+
+    // In-batch peer conflicts (not yet saved).
+    var peerMsg = null;
+    var cStart = combineDateAndTime_(parseDateInput_(c.date), parseTimeInput_(c.startTime));
+    var cEnd = cStart ? combineDateAndTime_(parseDateInput_(c.date), parseTimeInput_(
+      addMinutesToTimeStr_(c.startTime, parseInt(c.durationMinutes, 10)))) : null;
+    for (var j = 0; j < prepared.length; j++) {
+      var other = prepared[j];
+      if (other.date !== c.date) continue;
+      if (cStart && other.startDT && other.endDT && cEnd &&
+          cStart.getTime() < other.endDT.getTime() && other.startDT.getTime() < cEnd.getTime()) {
+        peerMsg = label + ' overlaps another new Day 2 row (#' + (other.index + 1) + ') in this batch.';
+        break;
+      }
+      if (staffEmail && staffEmail === other.staffEmail && c.date === other.date &&
+          cStart && other.startDT && other.endDT && cEnd &&
+          cStart.getTime() < other.endDT.getTime() && other.startDT.getTime() < cEnd.getTime()) {
+        peerMsg = label + ' assigns the same staff as overlapping row #' + (other.index + 1) + '.';
+        break;
+      }
+    }
+
+    if (validation.errors.length || peerMsg) {
+      var msgs = validation.errors.slice();
+      if (peerMsg) msgs.push(peerMsg);
+      results.push({ success: false, input: c, message: msgs.join('\n'), errors: msgs });
+      continue;
+    }
+
+    prepared.push({
+      index: i,
+      input: c,
+      staffEmail: staffEmail,
+      date: c.date,
+      startDT: cStart,
+      endDT: cEnd,
+      options: options
+    });
+    results.push({ success: true, input: c, pending: true });
+  }
+
+  var failed = results.filter(function (r) { return !r.success; });
+  if (failed.length) {
+    return {
+      success: false,
+      results: results,
+      message: failed.length + ' of ' + candidates.length + ' Day 2 row(s) failed validation. Nothing was created.'
+    };
+  }
+
+  var created = [];
+  for (var k = 0; k < prepared.length; k++) {
+    var p = prepared[k];
+    var payload = {
+      date: p.input.date,
+      startTime: p.input.startTime,
+      durationMinutes: p.input.durationMinutes,
+      staffEmail: p.staffEmail,
+      language: p.input.language,
+      suppressNotification: true
+    };
+    var r = createIndependentDay2SlotInternal_(session, payload);
+    r.input = p.input;
+    results[p.index] = r;
+    if (!r.success) {
+      return {
+        success: false,
+        results: results,
+        message: 'Stopped while creating row #' + (p.index + 1) + ': ' + (r.message || 'unknown error') +
+          '. Earlier rows in this batch may already exist — check the Day 2 table.',
+        partiallyCreated: created
+      };
+    }
+    created.push(r);
+  }
+
+  // One consolidated staff notification for the whole batch (no scheduleCreated).
+  var byStaff = {};
+  created.forEach(function (r) {
+    var email = String(r.staffEmail || '').toLowerCase();
+    if (!email) return;
+    if (!byStaff[email]) byStaff[email] = [];
+    byStaff[email].push(r.summary || r.slotID);
+  });
+  Object.keys(byStaff).forEach(function (email) {
+    sendStaffAssignmentEmails_(
+      null,
+      {
+        staffEmail: email,
+        details: 'Day 2 slot(s) created:\n\u2022 ' + byStaff[email].join('\n\u2022 ') +
+          '\n\nLocation: ' + CONFIG.LOCATION.address
+      }
+    );
+  });
+
+  return {
+    success: true,
+    results: results,
+    message: created.length + ' Day 2 slot(s) created.'
+  };
+}
+
+/** Auth-aware helper used by independent Day 2 create/bulk (avoids re-auth loops). */
+function getIndependentDay2OptionsForSession_(session, candidate) {
   var parsed = validateSlotInputWithDuration_(candidate);
   if (parsed.error) return { success: false, message: parsed.error };
 
   var candidateDateTime = combineDateAndTime_(parsed.date, parsed.start);
-
-  // Round 5 fix: this used to hardcode Day1×Day2 as an unconditional block
-  // and MRI overlap as an unconditional warning (findExperimentBlockingOverlap_
-  // / findMriOverlapsForExperiment_) — bypassing the Scheduling Rules config
-  // entirely. Worse, because createIndependentDay2Slot() calls this function
-  // FIRST and returns immediately on failure, a config change here could
-  // never even reach the authoritative validateBehaviouralSlot_() check that
-  // runs afterward. Now both stages agree, using the same engine.
   var candidateValidation = validateSchedulingSlot_({
     candidateType: 'Day2',
     dateStr: candidate.date,
     startTimeStr: candidate.startTime,
     durationMinutes: candidate.durationMinutes,
-    staffEmail: '',
+    staffEmail: String(candidate.staffEmail || '').trim().toLowerCase(),
     label: 'This candidate Day 2 slot'
   });
   if (candidateValidation.errors.length) {
@@ -6061,7 +6576,7 @@ function getIndependentDay2Options(token, candidate) {
     return {
       success: false,
       message: 'No existing available Day 1 slot is compatible with this candidate (needs to start ' +
-        CONFIG.MAPPING_WINDOW_MIN_HOURS + '–' + CONFIG.MAPPING_WINDOW_MAX_HOURS + ' hours before it). ' +
+        CONFIG.MAPPING_WINDOW_MIN_HOURS + '\u2013' + CONFIG.MAPPING_WINDOW_MAX_HOURS + ' hours before it). ' +
         'Add a Day 1 slot in that window first, or adjust the candidate time.'
     };
   }
@@ -6071,128 +6586,6 @@ function getIndependentDay2Options(token, candidate) {
     compatibleDay1: compatible,
     mriOverlaps: mriOverlaps,
     candidate: { date: candidate.date, startTime: candidate.startTime, endTime: parsed.endTimeStr, durationMinutes: candidate.durationMinutes }
-  };
-}
-
-/**
- * Client-callable: creates the independent Day 2 slot after the admin has
- * reviewed the compatible Day 1 option(s) and picked a staff member.
- * Re-validates everything inside a lock (authoritative, never trusts the
- * client-side preview).
- * @param {string} token
- * @param {Object} data - {date, startTime, durationMinutes, staffEmail}
- * @return {Object}
- */
-function createIndependentDay2Slot(token, data) {
-  var session = requireAdminAuth_(token);
-  requirePermission_(session, 'manage_slots');
-
-  var staffEmail = String((data && data.staffEmail) || '').trim().toLowerCase();
-  if (!staffEmail) return { success: false, message: 'Please select an assigned staff member.' };
-  var staffMatch = getApprovedStaffList_().some(function (s) { return s.email.toLowerCase() === staffEmail; });
-  if (!staffMatch) return { success: false, message: 'That staff member was not found in the Staff sheet.' };
-
-  var lock = LockService.getScriptLock();
-  try {
-    lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
-  } catch (lockError) {
-    return { success: false, message: 'The system is busy. Please try again in a moment.' };
-  }
-
-  try {
-    var options = getIndependentDay2Options(token, data);
-    if (!options.success) return options;
-
-    var parsed = validateSlotInputWithDuration_(data);
-    if (parsed.error) return { success: false, message: parsed.error };
-
-    // Round 3, #4: independent Day 2 creation follows exactly the same rules
-    // as the individual and bulk MRI-driven workflows.
-    var indepValidation = validateBehaviouralSlot_({
-      dateStr: data.date,
-      startTimeStr: data.startTime,
-      durationMinutes: data.durationMinutes,
-      staffEmail: staffEmail,
-      excludeSlotID: null,
-      excludeMriSlotID: null,
-      label: 'This Day 2 slot'
-    });
-    if (indepValidation.errors.length) {
-      return {
-        success: false,
-        errors: indepValidation.errors,
-        warnings: indepValidation.warnings,
-        conflicts: describeBehaviouralOverlaps_(indepValidation.behaviouralConflicts),
-        message: indepValidation.errors.join('\n')
-      };
-    }
-
-    var slotId = generateNextSlotId_(CONFIG.SHEETS.DAY2, 'D2');
-    var startDT = combineDateAndTime_(parsed.date, parsed.start);
-    var endDT = combineDateAndTime_(parsed.date, parsed.end);
-    var eventId = upsertStaffCalendarEvent_(
-      'Day 2 — ' + CONFIG.EXPERIMENT_NAME.en + ' (' + slotId + ')', startDT, endDT, staffEmail, '', 'day2ScheduleCreated'
-    );
-
-    getSheet_(CONFIG.SHEETS.DAY2).appendRow([slotId, parsed.date, parsed.start, parsed.end, false, staffEmail, eventId, createdByLegacy_(session), new Date(), normalizeSlotLanguage_(data.language)]);
-
-    var summary = slotId + ' (' + data.date + ' ' + data.startTime + '–' + parsed.endTimeStr + ')';
-    var compatibleSummary = options.compatibleDay1.map(function (d1) {
-      return d1.slotID + ' (' + d1.date + ' ' + d1.startTime + ')';
-    }).join(', ');
-
-    notifyAdminOfChange_(
-      'Independent Day 2 slot created',
-      [
-        'Day 2 slot: ' + summary,
-        'Assigned staff: ' + (getStaffNameByEmail_(staffEmail) || staffEmail),
-        'Compatible with Day 1 slot(s): ' + compatibleSummary,
-        'Created by: ' + session.name
-      ],
-      'scheduleCreated'
-    );
-
-    sendStaffAssignmentEmails_(
-      null,
-      { staffEmail: staffEmail, details: 'Day 2 slot ' + summary + ' — ' + CONFIG.LOCATION.address }
-    );
-
-    return {
-      success: true,
-      message: 'Experiment Schedule has been updated successfully.',
-      slotID: slotId,
-      addedSummary: { day2: summary, staff: staffEmail, compatibleDay1: options.compatibleDay1 }
-    };
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-/**
- * Client-callable (manage_slots): create several independent Day 2 slots
- * in one call (round 10). Each candidate goes through the exact same
- * validation and creation path as createIndependentDay2Slot — assigned
- * staff is still REQUIRED per row here (unlike Blood Drawing), matching
- * the single-slot behaviour this replaces. One candidate failing doesn't
- * stop the rest.
- * @param {string} token
- * @param {Array<Object>} candidates - [{date, startTime, durationMinutes, staffEmail, language}]
- * @return {Object} {success, results: [{success, slotID?, message?, input}]}
- */
-function bulkCreateIndependentDay2Slots(token, candidates) {
-  if (!candidates || !candidates.length) {
-    return { success: false, message: 'Add at least one Day 2 slot first.' };
-  }
-  var results = (candidates || []).map(function (c) {
-    var r = createIndependentDay2Slot(token, c);
-    r.input = c;
-    return r;
-  });
-  var successCount = results.filter(function (r) { return r.success; }).length;
-  return {
-    success: successCount > 0,
-    results: results,
-    message: successCount + ' of ' + results.length + ' Day 2 slot(s) created.'
   };
 }
 
@@ -6301,8 +6694,12 @@ function createScheduleFromMriInternal_(session, input) {
 
     // Day 1 validation under the round-3 unified rules: behaviour-vs-behaviour
     // always blocks; behaviour-vs-MRI only warns unless the same staff member
-    // is on both sides. Day 1's stored span already includes the pre-MRI
-    // period, and its OWN MRI slot is excluded from the MRI overlap report.
+    // is on both sides. Day 1's OWN MRI and already-linked Blood Drawing slot
+    // (created at MRI-creation time) are excluded — they are the same schedule.
+    var existingBdForMri = findBloodDrawingRowByMriSlotID_(input.mriSlotID);
+    var existingBdSlotId = existingBdForMri
+      ? String(existingBdForMri.values[CONFIG.BLOOD_DRAWING_COLS.SLOT_ID])
+      : null;
     var day1DurationMinutes = parseInt(input.timeBeforeMriMinutes, 10) + parseInt(input.mriDurationMinutes, 10);
     var day1Validation = validateBehaviouralSlot_({
       dateStr: computed.day1Date,
@@ -6311,6 +6708,7 @@ function createScheduleFromMriInternal_(session, input) {
       staffEmail: day1StaffEmail,
       excludeSlotID: null,
       excludeMriSlotID: input.mriSlotID,
+      excludeBloodDrawingSlotID: existingBdSlotId,
       label: 'Day 1'
     });
     var allValidationErrors = day1Validation.errors.slice();
@@ -6353,15 +6751,15 @@ function createScheduleFromMriInternal_(session, input) {
       allValidationWarnings = allValidationWarnings.concat(mriResizeValidation.warnings);
     }
 
-    // Round 5, #4: every Day 1 slot auto-generates a linked Blood Drawing slot,
-    // so validate THAT slot too — through the same centralized validator —
-    // before committing. Its staff defaults to the Day 1 staff member, so a
-    // same-staff conflict against an overlapping Blood Drawing slot (or a
-    // not-permitted BD overlap) blocks creation here. This runs for every
-    // schedule-creation entry point, including pushing MRI slots to the
-    // schedule (individual and bulk).
+    // Blood Drawing was already auto-created when the MRI slot was created.
+    // Validate the BD *window* for conflicts against OTHER slots, but exclude
+    // the existing linked BD (and this MRI) so we do not false-positive on
+    // "the BD this Day 1 will generate" overlapping BD-001 that already exists.
     var bdValidation = previewGeneratedBloodDrawingValidation_(
-      computed.day1Date, computed.day1StartTime, day1StaffEmail);
+      computed.day1Date, computed.day1StartTime, day1StaffEmail, {
+        excludeBloodDrawingSlotID: existingBdSlotId,
+        excludeMriSlotID: input.mriSlotID
+      });
     if (bdValidation.errors.length) {
       return {
         success: false,
@@ -6484,6 +6882,15 @@ function createScheduleFromMriInternal_(session, input) {
       }
 
       parsedNewDay2.push({ parsed: parsed, raw: entry });
+    }
+
+    if (input.dryRun) {
+      return {
+        success: true,
+        dryRun: true,
+        warnings: allValidationWarnings.concat(mriOverlapWarnings),
+        message: 'Validation passed (dry run).'
+      };
     }
 
     // ---- All checks passed — commit ----
@@ -6668,18 +7075,19 @@ function notifyScheduleCreated_(infos) {
   overviewLines.push('Created by: ' + (infos[0].createdByName || infos[0].createdBy));
   var overview = overviewLines.join('\n');
 
-  // Round 6 fix: the FULL recipient set — including whether directly-
-  // assigned staff get their own personalized notice — now comes from the
-  // Notification Settings matrix for 'scheduleCreated'. "Assigned Staff" is
-  // a toggleable recipient group by design (per spec); if the Main Admin
-  // unchecks it, assigned staff do NOT get a notice from here, even though
-  // they're the one on the schedule. There is no unconditional carve-out.
+  // Recipients come from scheduleCreated plus the dedicated Day 1 / Day 2
+  // schedule-created matrix entries (union), so Main Admin can route each
+  // independently while same-staff-on-both still gets one consolidated mail.
   var allAssignedEmails = buildDedupedGuestList_(
     infos.reduce(function (acc, info) {
       return acc.concat([info.day1Staff]).concat(info.day2Assignments.map(function (a) { return a.staffEmail; }));
     }, [])
   );
-  var resolved = resolveNotificationRecipients_('scheduleCreated', { assignedStaff: allAssignedEmails });
+  var resolved = buildDedupedGuestList_(
+    resolveNotificationRecipients_('scheduleCreated', { assignedStaff: allAssignedEmails })
+      .concat(resolveNotificationRecipients_('day1ScheduleCreated', { assignedStaff: allAssignedEmails }))
+      .concat(resolveNotificationRecipients_('day2ScheduleCreated', { assignedStaff: allAssignedEmails }))
+  );
   var resolvedLower = resolved.map(function (e) { return String(e).toLowerCase(); });
 
   // Build recipient -> their own assignments (across EVERY info in this
@@ -6710,6 +7118,12 @@ function notifyScheduleCreated_(infos) {
   Object.keys(recipients).forEach(function (key) {
     var r = recipients[key];
     var isAssigned = r.assignments.length > 0;
+    var hasD1 = r.assignments.some(function (a) { return String(a).indexOf('Day 1:') === 0; });
+    var hasD2 = r.assignments.some(function (a) { return String(a).indexOf('Day 2:') === 0; });
+    var subjectKey = !isAssigned ? 'scheduleCreated'
+      : (hasD1 && hasD2) ? 'staffAssignment'
+      : hasD1 ? 'day1ScheduleCreated'
+      : 'day2ScheduleCreated';
     var projectId = getProjectId();
     var projectLine = projectId ? ('Project: ' + projectId + '\n\n') : '';
     var body = isAssigned
@@ -6729,7 +7143,7 @@ function notifyScheduleCreated_(infos) {
     try {
       MailApp.sendEmail(
         r.email,
-        isAssigned ? emailSubject_('staffAssignment') : emailSubject_('scheduleCreated'),
+        emailSubject_(subjectKey),
         body
       );
     } catch (err) {
@@ -6935,6 +7349,7 @@ function saveScheduleEdits(token, edits) {
       var d1OldStaff = String(d1Record.values[CONFIG.DAY1_EXTRA_COLS.ASSIGNED_STAFF] || '');
       var d1NewStaff = String(edits.day1.staffEmail || '').trim().toLowerCase();
       if (d1NewStaff !== d1OldStaff.toLowerCase()) {
+        var d1Excl = sameScheduleExclusionsForDay1_(edits.day1.slotID);
         var d1Validation = validateSchedulingSlot_({
           candidateType: 'Day1',
           dateStr: toIsoDateStr_(d1Record.values[cols.DATE]),
@@ -6942,7 +7357,7 @@ function saveScheduleEdits(token, edits) {
           durationMinutes: Math.round((combineDateAndTime_(d1Record.values[cols.DATE], d1Record.values[cols.END_TIME]).getTime() -
                                        combineDateAndTime_(d1Record.values[cols.DATE], d1Record.values[cols.START_TIME]).getTime()) / 60000),
           staffEmail: d1NewStaff,
-          excludeSlotIDs: { Day1: edits.day1.slotID },
+          excludeSlotIDs: d1Excl,
           label: 'Day 1 slot ' + edits.day1.slotID
         });
         if (d1Validation.errors.length) {
@@ -7460,6 +7875,30 @@ function cleanUpLinkedBloodDrawingSlots_(day1SlotID) {
   }
 }
 
+/** Soft-delete one specific Blood Drawing slot (used by the deletion picker). */
+function cleanUpSpecificBloodDrawingSlot_(bdSlotID, day1SlotID) {
+  try {
+    var rec = findBloodDrawingRow_(bdSlotID);
+    if (!rec) return;
+    var cols = CONFIG.BLOOD_DRAWING_COLS;
+    var eventId = String(rec.values[cols.CALENDAR_EVENT_ID] || '');
+    if (eventId) deleteBloodDrawingCalendarEvent_(eventId);
+    softDeleteById_(CONFIG.SHEETS.BLOOD_DRAWING, cols.SLOT_ID, bdSlotID,
+      'system', 'Linked Day 1 slot ' + (day1SlotID || '') + ' deleted');
+    notifyBloodDrawingSlotsRemoved_(
+      [bdSlotID],
+      [String(rec.values[cols.ASSIGNED_STAFF] || '')],
+      parseTaEmails_(rec.values[cols.ASSIGNED_TA]),
+      day1SlotID || ''
+    );
+    if (eventId) {
+      notifyMainAdminCalendarEventDeleted_('Blood Drawing slot ' + bdSlotID, []);
+    }
+  } catch (err) {
+    Logger.log('cleanUpSpecificBloodDrawingSlot_ failed: ' + err);
+  }
+}
+
 /**
  * Notifies the Blood Drawing staff, all TAs, and the Main Admin that Blood
  * Drawing slot(s) were removed because their linked Day 1 slot was deleted
@@ -7889,7 +8328,8 @@ function linkOrCreateBloodDrawingForSchedule_(mriSlotID, day1SlotID, day1DateVal
  * not-permitted BD overlap) and surface warnings. Does not write anything.
  * @return {{errors, warnings, staffConflict, taConflict}}
  */
-function previewGeneratedBloodDrawingValidation_(day1DateStr, day1StartStr, day1StaffEmail) {
+function previewGeneratedBloodDrawingValidation_(day1DateStr, day1StartStr, day1StaffEmail, excludeOpts) {
+  excludeOpts = excludeOpts || {};
   var startStr = day1StartStr;
   return validateSchedulingSlot_({
     candidateType: 'BloodDrawing',
@@ -7898,6 +8338,11 @@ function previewGeneratedBloodDrawingValidation_(day1DateStr, day1StartStr, day1
     durationMinutes: CONFIG.BLOOD_DRAWING_DEFAULT_MINUTES,
     staffEmail: day1StaffEmail || '',
     taEmails: [],
+    excludeSlotIDs: {
+      BloodDrawing: excludeOpts.excludeBloodDrawingSlotID || null,
+      MRI: excludeOpts.excludeMriSlotID || null,
+      Day1: excludeOpts.excludeDay1SlotID || null
+    },
     label: 'The Blood Drawing slot this Day 1 slot will generate'
   });
 }
@@ -7911,12 +8356,22 @@ function getBloodDrawingSlots(token) {
     throw new Error('Your role does not have permission to view Blood Drawing slots.');
   }
   var cols = CONFIG.BLOOD_DRAWING_COLS;
+  var mriCol = bdMriColumn_(); // 1-based sheet column
   var rows = getDataRows_(CONFIG.SHEETS.BLOOD_DRAWING);
   var out = [];
   rows.forEach(function (row) {
     if (!row[cols.SLOT_ID]) return;
     if (!isOnOrAfterToday_(row[cols.DATE])) return;
     var taEmails = parseTaEmails_(row[cols.ASSIGNED_TA]);
+    var hasParticipant = isBooked_(row[cols.BOOKED]) || !!String(row[cols.PARTICIPANT_CONFIRMATION] || '').trim();
+    // Available = TA assigned + not booked; Unavailable = no TA; Booked = participant.
+    var status = hasParticipant ? 'Booked' : (taEmails.length ? 'Available' : 'Unavailable');
+    var mriSlotID = String(row[mriCol - 1] || '');
+    var day1SlotID = String(row[cols.DAY1_SLOT_ID] || '');
+    // Related Slot ID prefers MRI (auto-link); falls back to Day 1 for display.
+    var relatedSlotID = mriSlotID || day1SlotID;
+    // Read-only when this ID points at a real MRI slot (auto/manual MRI link).
+    var relatedSlotLocked = !!(mriSlotID && getSlotByFullRow_(CONFIG.SHEETS.MRI, mriSlotID));
     out.push({
       slotID: String(row[cols.SLOT_ID]),
       date: formatDateForDisplay_(row[cols.DATE], 'en'),
@@ -7925,12 +8380,17 @@ function getBloodDrawingSlots(token) {
       rawDate: toIsoDateStr_(row[cols.DATE]),
       rawStart: toHmStr_(row[cols.START_TIME]),
       rawEnd: toHmStr_(row[cols.END_TIME]),
-      booked: isBooked_(row[cols.BOOKED]),
+      booked: hasParticipant,
+      status: status,
       assignedTAs: taEmails,
       assignedTANames: taEmails.map(function (e) { return getStaffNameByEmail_(e); }),
       assignedStaff: String(row[cols.ASSIGNED_STAFF] || ''),
-      day1SlotID: String(row[cols.DAY1_SLOT_ID] || ''),
-      participantName: String(row[cols.PARTICIPANT_NAME] || '')
+      day1SlotID: day1SlotID,
+      mriSlotID: mriSlotID,
+      relatedSlotID: relatedSlotID,
+      relatedSlotLocked: relatedSlotLocked,
+      participantName: String(row[cols.PARTICIPANT_NAME] || ''),
+      participantConfirmation: String(row[cols.PARTICIPANT_CONFIRMATION] || '')
     });
   });
   return out;
@@ -8102,13 +8562,32 @@ function linkBloodDrawingToBooking_(day1SlotID, confirmationNumber, participantN
     rec.sheet.getRange(rec.rowIndex, cols.PARTICIPANT_NAME + 1).setValue(participantName || '');
     var taEmails = parseTaEmails_(rec.values[cols.ASSIGNED_TA]);
     var staffEmail = String(rec.values[cols.ASSIGNED_STAFF] || '');
+    var slotID = String(rec.values[cols.SLOT_ID]);
     var startDT = combineDateAndTime_(rec.values[cols.DATE], rec.values[cols.START_TIME]);
     var endDT = combineDateAndTime_(rec.values[cols.DATE], rec.values[cols.END_TIME]);
     var oldEventId = String(rec.values[cols.CALENDAR_EVENT_ID] || '');
     var newEventId = upsertBloodDrawingCalendarEvent_(
-      String(rec.values[cols.SLOT_ID]), startDT, endDT, taEmails, participantName || '', oldEventId, 'Booked', staffEmail
+      slotID, startDT, endDT, taEmails, participantName || '', oldEventId, 'Booked', staffEmail
     );
     rec.sheet.getRange(rec.rowIndex, cols.CALENDAR_EVENT_ID + 1).setValue(newEventId);
+
+    // Dedicated matrix event (not generic bloodDrawingUpdates).
+    var when = formatSlotDateTimeForEmail_(rec.values[cols.DATE], rec.values[cols.START_TIME], rec.values[cols.END_TIME]);
+    notifyAdminOfChange_(
+      'Blood Drawing slot booked',
+      [
+        'Blood Drawing slot: ' + slotID + ' (' + when + ')',
+        'Confirmation number: ' + (confirmationNumber || '(none)'),
+        'Participant: ' + (participantName || '(none)'),
+        'Day 1 slot: ' + day1SlotID
+      ],
+      'bloodDrawingSlotBooked',
+      {
+        assignedStaff: staffEmail ? [staffEmail] : [],
+        bloodDrawingStaff: staffEmail ? [staffEmail] : [],
+        technicalAssistants: taEmails
+      }
+    );
   } catch (err) {
     Logger.log('linkBloodDrawingToBooking_ failed for ' + day1SlotID + ': ' + err);
   }
@@ -8124,24 +8603,46 @@ function linkBloodDrawingToBooking_(day1SlotID, confirmationNumber, participantN
  * Never throws — a failure here must not roll back the cancellation.
  * @param {string} day1SlotID
  */
-function unlinkBloodDrawingFromBooking_(day1SlotID) {
+function unlinkBloodDrawingFromBooking_(day1SlotID, options) {
   try {
+    options = options || {};
     var rec = findBloodDrawingRowByDay1SlotID_(day1SlotID);
     if (!rec) return;
     var cols = CONFIG.BLOOD_DRAWING_COLS;
-    if (!String(rec.values[cols.PARTICIPANT_CONFIRMATION] || '') && !isBooked_(rec.values[cols.BOOKED])) return; // nothing to undo
+    var prevConf = String(rec.values[cols.PARTICIPANT_CONFIRMATION] || '');
+    if (!prevConf && !isBooked_(rec.values[cols.BOOKED])) return; // nothing to undo
+    if (options.skipUnlink) return;
     rec.sheet.getRange(rec.rowIndex, cols.BOOKED + 1).setValue(false);
     rec.sheet.getRange(rec.rowIndex, cols.PARTICIPANT_CONFIRMATION + 1).setValue('');
     rec.sheet.getRange(rec.rowIndex, cols.PARTICIPANT_NAME + 1).setValue('');
     var taEmails = parseTaEmails_(rec.values[cols.ASSIGNED_TA]);
     var staffEmail = String(rec.values[cols.ASSIGNED_STAFF] || '');
+    var slotID = String(rec.values[cols.SLOT_ID]);
     var startDT = combineDateAndTime_(rec.values[cols.DATE], rec.values[cols.START_TIME]);
     var endDT = combineDateAndTime_(rec.values[cols.DATE], rec.values[cols.END_TIME]);
     var oldEventId = String(rec.values[cols.CALENDAR_EVENT_ID] || '');
     var newEventId = upsertBloodDrawingCalendarEvent_(
-      String(rec.values[cols.SLOT_ID]), startDT, endDT, taEmails, '', oldEventId, 'Available', staffEmail
+      slotID, startDT, endDT, taEmails, '', oldEventId, 'Available', staffEmail
     );
     rec.sheet.getRange(rec.rowIndex, cols.CALENDAR_EVENT_ID + 1).setValue(newEventId);
+
+    if (!options.suppressNotification) {
+      var when = formatSlotDateTimeForEmail_(rec.values[cols.DATE], rec.values[cols.START_TIME], rec.values[cols.END_TIME]);
+      notifyAdminOfChange_(
+        'Blood Drawing slot unbooked',
+        [
+          'Blood Drawing slot: ' + slotID + ' (' + when + ')',
+          'Previous confirmation number: ' + (prevConf || '(none)'),
+          'Day 1 slot: ' + day1SlotID
+        ],
+        'bloodDrawingSlotUnbooked',
+        {
+          assignedStaff: staffEmail ? [staffEmail] : [],
+          bloodDrawingStaff: staffEmail ? [staffEmail] : [],
+          technicalAssistants: taEmails
+        }
+      );
+    }
   } catch (err) {
     Logger.log('unlinkBloodDrawingFromBooking_ failed for ' + day1SlotID + ': ' + err);
   }
@@ -8373,6 +8874,14 @@ function editBloodDrawingSlot(token, slotID, data) {
   rec.sheet.getRange(rec.rowIndex, cols.ASSIGNED_STAFF + 1).setValue(newStaff);
   rec.sheet.getRange(rec.rowIndex, cols.ASSIGNED_TA + 1).setValue(serializeTaEmails_(newTAs));
 
+  // Related Slot ID (MRISlotID column): editable only when not auto-linked.
+  var mriCol = bdMriColumn_();
+  var existingMri = String(rec.values[mriCol - 1] || '');
+  if (data.hasOwnProperty('relatedSlotID') && !existingMri) {
+    var related = String(data.relatedSlotID || '').trim();
+    rec.sheet.getRange(rec.rowIndex, mriCol).setValue(related);
+  }
+
   // Update the calendar event.
   var startDT = combineDateAndTime_(newDate, newStart);
   var endDT = combineDateAndTime_(newDate, newEnd);
@@ -8384,12 +8893,14 @@ function editBloodDrawingSlot(token, slotID, data) {
 
   // Notify everyone affected — previous + new staff, and previous + new TAs
   // (so both removed and added people hear about it), deduplicated.
-  notifyBloodDrawingChange_(slotID, [prevStaff, newStaff], prevTAs.concat(newTAs), 'update');
+  // Prefer dedicated reassignment event when TAs actually changed.
+  var taChanged = prevTAs.slice().sort().join(',') !== newTAs.slice().sort().join(',');
+  notifyBloodDrawingChange_(slotID, [prevStaff, newStaff], prevTAs.concat(newTAs), taChanged ? 'reassignment' : 'update');
 
   return { success: true, message: 'Blood Drawing slot updated.' };
 }
 
-/** Client-callable (manage_blood_drawing_schedules): delete a Blood Drawing slot (booked ones are unbooked+deleted). */
+/** Client-callable (manage_blood_drawing_schedules): delete a Blood Drawing slot. Booked slots cannot be deleted. */
 function deleteBloodDrawingSlot(token, slotID) {
   var session = requireAdminAuth_(token);
   requirePermission_(session, 'manage_blood_drawing_schedules');
@@ -8397,10 +8908,14 @@ function deleteBloodDrawingSlot(token, slotID) {
   var rec = findBloodDrawingRow_(slotID);
   if (!rec) return { success: false, message: 'Blood Drawing slot not found.' };
   var cols = CONFIG.BLOOD_DRAWING_COLS;
+  var hasParticipant = isBooked_(rec.values[cols.BOOKED]) || !!String(rec.values[cols.PARTICIPANT_CONFIRMATION] || '').trim();
+  if (hasParticipant) {
+    return { success: false, message: 'Booked Blood Drawing slots cannot be deleted. Cancel the booking first.' };
+  }
   var eventId = String(rec.values[cols.CALENDAR_EVENT_ID] || '');
   if (eventId) deleteStaffCalendarEvent_(eventId);
 
-  var summary = slotID + ' (' + formatDateForDisplay_(rec.values[cols.DATE], 'en') + ' ' +
+  var summary = slotID + ' (' + formatDateNumeric_(rec.values[cols.DATE]) + ' ' +
     formatTimeForDisplay_(rec.values[cols.START_TIME], 'en') + '–' + formatTimeForDisplay_(rec.values[cols.END_TIME], 'en') + ')';
   var affectedStaff = String(rec.values[cols.ASSIGNED_STAFF] || '') ? [String(rec.values[cols.ASSIGNED_STAFF])] : [];
   var affectedTAs = parseTaEmails_(rec.values[cols.ASSIGNED_TA]);
@@ -8755,12 +9270,14 @@ function getTABloodDrawingAvailabilityGrid(token) {
 
   var meLower = session.email.toLowerCase();
   var slots = rows.map(function (row) {
+    var hasParticipant = isBooked_(row[cols.BOOKED]) || !!String(row[cols.PARTICIPANT_CONFIRMATION] || '').trim();
     return {
       slotID: String(row[cols.SLOT_ID]),
       monthLabel: Utilities.formatDate(row[cols.DATE], tz, 'MMMM yyyy'),
       dayLabel: Utilities.formatDate(row[cols.DATE], tz, 'EEE. d'),
       timeLabel: formatTimeForDisplay_(row[cols.START_TIME], 'en') + '\u2013' + formatTimeForDisplay_(row[cols.END_TIME], 'en'),
       bookingID: String(row[cols.PARTICIPANT_CONFIRMATION] || ''),
+      booked: hasParticipant,
       taEmails: parseTaEmails_(row[cols.ASSIGNED_TA])
     };
   });
@@ -8781,7 +9298,12 @@ function getTABloodDrawingAvailabilityGrid(token) {
       dayMap[dayKey] = { label: s.dayLabel, slots: [] };
       monthMap[s.monthLabel].days.push(dayMap[dayKey]);
     }
-    dayMap[dayKey].slots.push({ slotID: s.slotID, timeLabel: s.timeLabel, bookingID: s.bookingID });
+    dayMap[dayKey].slots.push({
+      slotID: s.slotID,
+      timeLabel: s.timeLabel,
+      bookingID: s.bookingID,
+      booked: s.booked
+    });
   });
 
   // Roster: every known active TA, so someone with zero assignments still
@@ -8814,6 +9336,7 @@ function getTABloodDrawingAvailabilityGrid(token) {
     months: months,
     slotIDs: slots.map(function (s) { return s.slotID; }),
     slotBookingIDs: slots.map(function (s) { return s.bookingID; }),
+    slotBookedFlags: slots.map(function (s) { return !!s.booked; }),
     tas: tas,
     totals: totals,
     meName: session.name,
@@ -9983,13 +10506,18 @@ var EMAIL_SUBJECTS_ = {
   bookingRescheduled: 'Booking Rescheduled',
   bookingCancelled: 'Booking Cancelled',
   bookingUnbooked: 'Booking Unbooked',
+  adminBookingUnbooked: 'Admin Unbooking',
   bloodDrawingAssignment: 'Blood Drawing Assignment',
   bloodDrawingReassignment: 'Blood Drawing Reassignment',
   bloodDrawingSlotCreated: 'Blood Drawing Slot Created',
   bloodDrawingAvailabilityUpdated: 'Blood Drawing Availability Updated',
   bloodDrawingUpdates: 'Blood Drawing Updates',
+  bloodDrawingSlotBooked: 'Blood Drawing Slot Booked',
+  bloodDrawingSlotUnbooked: 'Blood Drawing Slot Unbooked',
   bloodDrawingSlotDeleted: 'Blood Drawing Slot Deleted',
   bloodDrawingUnassigned: 'Blood Drawing Slot Unassigned',
+  day1ScheduleCreated: 'Day 1 Schedule Created',
+  day2ScheduleCreated: 'Day 2 Schedule Created',
   reminderUnassigned: 'Reminder: Unassigned Slots',
   reminderUnbooked: 'Reminder: Unbooked Slots',
   participantMessages: 'Participant Question',
@@ -10022,7 +10550,8 @@ function emailSubject_(key) {
  */
 function bilingualBody_(germanBody, englishBody) {
   var divider = '\n\n----------------------------------------\n\n';
-  return 'DEUTSCH\n\n' + germanBody + divider + 'ENGLISH\n\n' + englishBody;
+  // Avoid bare "DEUTSCH"/"ENGLISH" tokens that some clients auto-hyperlink.
+  return '--- Deutsch ---\n\n' + germanBody + divider + '--- English ---\n\n' + englishBody;
 }
 
 /**
@@ -10719,6 +11248,33 @@ function bulkCreateSchedulesFromMri(token, entries) {
   }
 
   try {
+    // Phase 1 — validate every entry with dryRun before writing anything.
+    // Push must not partially apply schedules.
+    for (var v = 0; v < (entries || []).length; v++) {
+      var pre = entries[v];
+      var preResult = createScheduleFromMriInternal_(session, {
+        mriSlotID: pre.mriSlotID,
+        day1StaffEmail: pre.day1StaffEmail,
+        timeBeforeMriMinutes: pre.timeBeforeMriMinutes,
+        mriDurationMinutes: pre.mriDurationMinutes,
+        existingDay2: pre.existingDay2 || [],
+        newDay2List: pre.newDay2List || [],
+        language: pre.language,
+        suppressNotification: true,
+        dryRun: true
+      });
+      if (!preResult.success) {
+        return {
+          success: false,
+          message: 'Validation failed for MRI slot ' + pre.mriSlotID + ': ' + preResult.message +
+            '. No schedules were created.',
+          errors: preResult.errors || [preResult.message],
+          warnings: preResult.warnings || [],
+          partiallyCreated: []
+        };
+      }
+    }
+
     var allCreated = [];
     var allWarnings = [];
     var allScheduleInfos = [];
@@ -10736,14 +11292,11 @@ function bulkCreateSchedulesFromMri(token, entries) {
         suppressNotification: true
       });
       if (!result.success) {
-        // Round 12: still send a consolidated batch for whatever succeeded
-        // before the failure, so anyone already assigned isn't left
-        // without a notice just because a LATER entry in the batch failed.
-        if (allScheduleInfos.length) notifyScheduleCreated_(allScheduleInfos);
-        if (allBdResults.length) notifyBloodDrawingAssignmentsBatch_(allBdResults);
+        // Should be rare after dry-run; do not send success notifications for a failed batch.
         return {
           success: false,
-          message: 'Stopped at MRI slot ' + entry.mriSlotID + ': ' + result.message,
+          message: 'Stopped at MRI slot ' + entry.mriSlotID + ': ' + result.message +
+            '. Some earlier schedules in this batch may already exist — check the overview tables.',
           errors: result.errors || [result.message],
           warnings: result.warnings || [],
           partiallyCreated: allCreated

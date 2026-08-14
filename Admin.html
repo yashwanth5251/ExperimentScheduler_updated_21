@@ -648,6 +648,7 @@
             <select id="bdStatusFilter">
               <option value="">All</option>
               <option value="available">Available</option>
+              <option value="unavailable">Unavailable</option>
               <option value="booked">Booked</option>
             </select>
           </div>
@@ -670,7 +671,7 @@
         </div>
 
         <div class="table-scroll"><table class="slot-table" id="bdTable">
-          <thead><tr><th>Slot ID</th><th>Date</th><th>Start</th><th>End</th><th>Linked Day 1</th>
+          <thead><tr><th>Slot ID</th><th>Date</th><th>Start</th><th>End</th><th>Related Slot ID</th>
             <th>Assigned Staff</th><th>Assigned TA</th><th>Participant</th><th>Status</th><th></th></tr></thead>
           <tbody id="bdTableBody"></tbody>
         </table></div>
@@ -749,6 +750,13 @@
         <div class="form-row">
           <div class="form-group"><label for="bdEditStaffSelect">Assigned Staff</label><select id="bdEditStaffSelect"></select></div>
           <div class="form-group"><label for="bdEditTASelect">Technical Assistant(s) <span class="panel-subtitle">(Ctrl/Cmd-click for multiple)</span></label><select id="bdEditTASelect" multiple size="4"></select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="bdEditRelatedSlotID">Related Slot ID</label>
+            <input type="text" id="bdEditRelatedSlotID" placeholder="e.g. MRI-001">
+            <p class="hint" id="bdEditRelatedHint">Auto-linked MRI IDs are read-only. Manual slots can set a related ID freely.</p>
+          </div>
         </div>
         <div class="modal-actions">
           <button type="button" class="btn btn-primary" id="bdEditSaveBtn">Save Changes</button>
@@ -1225,6 +1233,10 @@
       <div class="modal">
         <h3>Delete Day 1 Slot</h3>
         <p id="deleteDay1ModalText"></p>
+        <div id="deleteDay1RelatedBox" class="hidden" style="margin: 12px 0;">
+          <p class="hint">Also delete these related slots (unchecked items are kept):</p>
+          <div id="deleteDay1RelatedList"></div>
+        </div>
         <ul id="deleteDay1OrphanList"></ul>
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="deleteDay1CancelBtn">Cancel</button>
@@ -1250,11 +1262,16 @@
       <div class="modal">
         <h3>Booked Slot — Choose an Action</h3>
         <p id="bookedActionModalText"></p>
+        <p class="hint" id="bookedActionBookingHint"></p>
+        <div id="bookedActionRelatedBox" class="hidden" style="margin: 12px 0;">
+          <p class="hint">Related slots to also clear / delete with this action:</p>
+          <div id="bookedActionRelatedList"></div>
+        </div>
         <p class="hint">
-          <strong>Unbook</strong> clears this booking and returns both slots to
+          <strong>Unbook</strong> clears this booking and returns selected slots to
           Available for a future participant.<br>
-          <strong>Delete Completely</strong> permanently removes both slots and the
-          booking record.
+          <strong>Delete Completely</strong> permanently removes the Day 1 slot, the
+          booking record, and any related slots you select below.
         </p>
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="bookedActionCancelBtn">Cancel</button>

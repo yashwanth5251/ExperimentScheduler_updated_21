@@ -1,5 +1,7 @@
 # Experiment Scheduling System — Setup & Deployment Guide
 
+> **Complete documentation (every file):** start at [`docs/README.md`](./docs/README.md) — architecture, guides, and a Markdown page for each project file ([file index](./docs/file-index.md)).
+
 A 2-day experiment booking app built on Google Apps Script + Google Sheets, with a
 password-protected Admin portal for managing slots.
 
@@ -20,6 +22,12 @@ password-protected Admin portal for managing slots.
 | `Admin.html`          | Admin portal page structure                                           |
 | `AdminJavaScript.html`| Admin portal client logic                                             |
 | `AdminStyles.html`    | Admin portal CSS                                                      |
+| `Shell.html` (+ JS/CSS) | Unified navbar + iframe host (Book / Manage / Admin)                |
+| `Manage.html` (+ JS/CSS) | Participant manage / reschedule / cancel                             |
+| `server/` / `api/`    | Node/Express host + Vercel entry (runs `Code.gs` in a VM)             |
+| `docs/`               | **Full per-file documentation** — see [`docs/README.md`](./docs/README.md) |
+
+For a page dedicated to **each** file (purpose, APIs, env, gotchas), open the [docs file index](./docs/file-index.md).
 
 ## 1. Create the Google Sheet
 
