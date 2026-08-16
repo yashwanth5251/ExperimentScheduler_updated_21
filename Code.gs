@@ -3334,6 +3334,18 @@ function createAdmin(token, data) {
   var session = requireAdminAuth_(token);
   requirePermission_(session, 'manage_admins');
 
+  // On Vercel without Redis/KV, writes go to ephemeral /tmp and disappear on
+  // the next serverless isolate — the UI can show "created" while login fails.
+  if (typeof Persistence_ !== 'undefined' && Persistence_.isEphemeral && Persistence_.isEphemeral()) {
+    return {
+      success: false,
+      message: 'Cannot create admins: this deployment has no durable database. ' +
+        'Connect Upstash Redis or Vercel KV (UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN, ' +
+        'or KV_REST_API_URL + KV_REST_API_TOKEN), redeploy, then create the account again. ' +
+        'See VERCEL.md.'
+    };
+  }
+
   var name = String((data && data.name) || '').trim();
   var email = String((data && data.email) || '').trim();
   var role = String((data && data.role) || '').trim();
@@ -3364,6 +3376,29 @@ function createAdmin(token, data) {
   notifyAdminOfChange_('Admin account created', ['Name: ' + name, 'Email: ' + email, 'Role: ' + role, 'Created by: ' + session.email], 'adminAccountChanges');
 
   return { success: true, message: 'Admin account created for ' + email + '.' };
+}
+
+/**
+ * Client-callable: whether sheet data is stored durably (Redis/KV) or only
+ * in ephemeral serverless /tmp. Used by Manage Admins to warn before create.
+ */
+function getPersistenceStatus(token) {
+  if (token) {
+    try { requireAdminAuth_(token); } catch (e) { /* allow unauthenticated for diagnostics */ }
+  }
+  var durable = true;
+  var type = 'file';
+  if (typeof Persistence_ !== 'undefined') {
+    type = Persistence_.type ? Persistence_.type() : type;
+    durable = Persistence_.isDurable ? Persistence_.isDurable() : true;
+  }
+  return {
+    durable: durable,
+    type: type,
+    message: durable
+      ? 'Data is stored durably (' + type + ').'
+      : 'No Redis/KV configured — new admins, bookings, and slots will not survive across requests on Vercel. Connect Upstash Redis or Vercel KV, then redeploy.'
+  };
 }
 
 /**

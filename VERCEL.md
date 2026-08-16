@@ -23,12 +23,14 @@ Use **Upstash Redis** (free) or **Vercel KV** so nothing is lost.
 | Variable | Value |
 |----------|--------|
 | `ALLOW_INSECURE_DEMO` | `1` (UI works; emails/calendar logged only) **or** unset and configure SMTP + Google below |
-| `ALLOW_EPHEMERAL_DATA` | only if you intentionally skip Redis (not recommended) |
+| `ALLOW_EPHEMERAL_DATA` | only if you intentionally skip Redis (**new admins/bookings will not persist** — not recommended) |
 | `ADMIN_OWNER_EMAIL` | `altersstudie@lin-magdeburg.de` |
 | `ADMIN_DEFAULT_PASSWORD` | `123456` |
 | `SCRIPT_TIMEZONE` | `Europe/Berlin` |
 | `BASE_URL` | your production URL, e.g. `https://your-app.vercel.app` |
 | `CRON_SECRET` | any long random string (optional; protects cron) |
+
+**Without Redis/KV**, `/health` reports `"persistence":"file"`. Creating admins may briefly look successful on one serverless instance, then disappear — login will fail. Always connect Redis before managing accounts.
 
 For full email + calendar (no demo mode), also set:
 

@@ -79,6 +79,13 @@ function createRuntime(options) {
   // Allow Code.gs to declare globals with `var` / `function`
   vm.createContext(sandbox);
 
+  // Durable vs ephemeral storage (Vercel /tmp is not shared across isolates).
+  sandbox.Persistence_ = {
+    type: function () { return store.backend.type; },
+    isDurable: function () { return store.isDurable(); },
+    isEphemeral: function () { return !store.isDurable(); }
+  };
+
   const codePath = path.join(projectRoot, 'Code.gs');
   const altPath = path.join(__dirname, '..', '..', 'Code.gs');
   const resolved = fs.existsSync(codePath) ? codePath
@@ -124,6 +131,7 @@ function createRuntime(options) {
     CalendarApp,
     triggerRegistry,
     call(name, args) {
+      if (typeof store.beginRequest === 'function') store.beginRequest();
       if (typeof sandbox[name] !== 'function') {
         throw new Error('Unknown server function: ' + name);
       }

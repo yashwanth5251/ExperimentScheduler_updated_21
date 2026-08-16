@@ -391,7 +391,7 @@
       'bulkDay2Error', 'bulkDay2Success', 'bulkDay2Table', 'bulkDay2TableBody', 'bulkDay2AddRowBtn', 'bulkDay2SaveBtn',
       'pwModalOverlay', 'pwModalError', 'pwStep1', 'pwStep2', 'pwCurrent', 'pwNew', 'pwConfirm',
       'pwOtp', 'pwOtpHint', 'pwCancelBtn1', 'pwCancelBtn2', 'pwRequestBtn', 'pwConfirmBtn',
-      'adminsModalOverlay', 'adminsModalError', 'adminsModalSuccess', 'adminsLoading',
+      'adminsModalOverlay', 'adminsModalError', 'adminsModalSuccess', 'adminsPersistenceWarn', 'adminsLoading',
       'adminsTable', 'adminsTableBody', 'newAdminName', 'newAdminEmail', 'newAdminRole',
       'newAdminPassword', 'createAdminBtn', 'adminsCloseBtn',
       'deleteDay1ModalOverlay', 'deleteDay1ModalText', 'deleteDay1OrphanList',
@@ -1431,9 +1431,27 @@
     els.newAdminName.value = '';
     els.newAdminEmail.value = '';
     els.newAdminPassword.value = '';
+    if (els.adminsPersistenceWarn) {
+      els.adminsPersistenceWarn.classList.add('hidden');
+      els.adminsPersistenceWarn.textContent = '';
+    }
     show_(els.adminsModalOverlay);
     show_(els.adminsLoading);
     hide_(els.adminsTable);
+
+    google.script.run
+      .withSuccessHandler(function (status) {
+        if (status && status.durable === false && els.adminsPersistenceWarn) {
+          els.adminsPersistenceWarn.textContent = status.message ||
+            'No durable database configured. New admin accounts will not survive and cannot log in. Connect Upstash Redis or Vercel KV, then redeploy.';
+          els.adminsPersistenceWarn.classList.remove('hidden');
+          if (els.createAdminBtn) els.createAdminBtn.disabled = true;
+        } else if (els.createAdminBtn) {
+          els.createAdminBtn.disabled = false;
+        }
+      })
+      .withFailureHandler(function () { /* non-fatal */ })
+      .getPersistenceStatus(state.token);
 
     google.script.run
       .withSuccessHandler(function (roles) {

@@ -34,11 +34,18 @@ function deserializeGrid(grid) {
 function createSpreadsheetStore(dbPath) {
   const backend = resolveBackend(dbPath);
   const memory = new Map();
+  const isServerless = !!(process.env.VERCEL || process.env.NOW_REGION || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  // Redis (and serverless generally): never trust process-lifetime sheet cache across
+  // requests — warm isolates previously overwrote newer Redis writes with stale memory.
+  const alwaysReload = backend.type === 'redis' || isServerless;
 
   function loadSheet(name) {
-    if (memory.has(name)) return memory.get(name);
+    if (!alwaysReload && memory.has(name)) return memory.get(name);
     const raw = backend.loadSheet(name);
-    if (!raw) return null;
+    if (!raw) {
+      memory.delete(name);
+      return null;
+    }
     const grid = deserializeGrid(raw);
     memory.set(name, grid);
     return grid;
@@ -111,10 +118,8 @@ function createSpreadsheetStore(dbPath) {
     return range;
   }
 
-  function createSheet(name, initialGrid) {
-    const grid = initialGrid || [[]];
-    saveSheet(name, grid);
-
+  /** Wrap an existing sheet name — does NOT re-persist (avoids clobbering Redis). */
+  function wrapSheet(name) {
     const sheet = {
       getName() { return name; },
       getLastRow() {
@@ -192,6 +197,13 @@ function createSpreadsheetStore(dbPath) {
     return sheet;
   }
 
+  /** Create a brand-new sheet and persist it. */
+  function createSheet(name, initialGrid) {
+    const grid = initialGrid || [[]];
+    saveSheet(name, grid);
+    return wrapSheet(name);
+  }
+
   const stmts = {
     getProp: {
       get(key) {
@@ -254,14 +266,16 @@ function createSpreadsheetStore(dbPath) {
     getSheetByName(sheetName) {
       const g = loadSheet(sheetName);
       if (!g) return null;
-      return createSheet(sheetName, g);
+      // Important: wrap only — do NOT re-save. Re-saving used to clobber Redis
+      // with a warm isolate's stale in-memory copy of the sheet.
+      return wrapSheet(sheetName);
     },
     insertSheet(sheetName) {
       if (loadSheet(sheetName)) throw new Error('Sheet already exists: ' + sheetName);
       return createSheet(sheetName, [[]]);
     },
     getSheets() {
-      return backend.listSheets().map((n) => createSheet(n, loadSheet(n)));
+      return backend.listSheets().map((n) => wrapSheet(n));
     },
     deleteSheet(sheet) {
       const n = typeof sheet === 'string' ? sheet : sheet.getName();
@@ -271,6 +285,18 @@ function createSpreadsheetStore(dbPath) {
     flush() { /* sync already */ }
   };
 
+  function clearMemory() {
+    memory.clear();
+  }
+
+  function isDurable() {
+    // True durable storage: Redis/KV on serverless, or local/Render disk.
+    // ALLOW_EPHEMERAL_DATA only silences boot warnings — it does NOT make
+    // /tmp shared across Vercel isolates, so never treat it as durable.
+    if (backend.type === 'redis') return true;
+    return !isServerless;
+  }
+
   return {
     db: null,
     stmts,
@@ -279,7 +305,13 @@ function createSpreadsheetStore(dbPath) {
     loadSheet,
     saveSheet,
     memory,
-    backend
+    backend,
+    clearMemory,
+    isDurable,
+    beginRequest() {
+      // Drop process cache so each API call reloads from Redis/disk.
+      if (alwaysReload) memory.clear();
+    }
   };
 }
 
